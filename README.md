@@ -53,6 +53,43 @@ docker compose exec app python -m scripts.migrate_from_gsheets /app/data/Microbi
 
 Go to `http://localhost:8000`, log in with your name and PIN, and start logging plants!
 
+## Running Tests
+
+Tests use an in-memory SQLite database and do not require Docker or any API keys.
+
+### Install test dependencies
+
+```bash
+pip install -r requirements-test.txt
+```
+
+### Run all tests
+
+```bash
+python3 -m pytest
+```
+
+### Run a specific file
+
+```bash
+python3 -m pytest tests/test_api.py
+python3 -m pytest tests/test_items.py
+python3 -m pytest tests/test_auth.py
+python3 -m pytest tests/test_weeks.py
+```
+
+### Run with verbose output
+
+```bash
+python3 -m pytest -v
+```
+
+The suite covers 56 tests across four areas:
+- **test_auth** — PIN hashing, JWT creation/decoding, login endpoint
+- **test_items** — item normalization, spelling suggestions, near-duplicate detection
+- **test_weeks** — week boundary calculation (Sunday–Saturday)
+- **test_api** — full HTTP integration tests for all endpoints
+
 ## Running Without Docker
 
 ```bash
