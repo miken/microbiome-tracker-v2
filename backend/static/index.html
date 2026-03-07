@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Microbiome Tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700&family=Fraunces:ital,wght@0,700;0,800;1,400&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --green-900: #1b4332;
+      --green-800: #2d6a4f;
+      --green-700: #40916c;
+      --green-600: #52b788;
+      --green-500: #74c69d;
+      --green-400: #95d5b2;
+      --green-300: #b7e4c7;
+      --green-200: #d8f3dc;
+      --green-100: #edf7f0;
+      --amber-500: #f59e0b;
+      --amber-100: #fef3c7;
+      --red-500: #ef4444;
+      --red-100: #fee2e2;
+      --gray-50: #f9fafb;
+      --gray-100: #f3f4f6;
+      --gray-200: #e5e7eb;
+      --gray-400: #9ca3af;
+      --gray-500: #6b7280;
+      --gray-600: #4b5563;
+      --gray-700: #374151;
+      --gray-800: #1f2937;
+      --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+      --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.07), 0 2px 4px -2px rgba(0,0,0,0.05);
+      --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.08), 0 4px 6px -4px rgba(0,0,0,0.05);
+      --radius: 12px;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'DM Sans', -apple-system, sans-serif;
+      background: linear-gradient(180deg, var(--green-200) 0%, var(--gray-50) 40%);
+      min-height: 100vh;
+      color: var(--gray-800);
+    }
+    .app { max-width: 480px; margin: 0 auto; padding: 0 16px 80px; }
+
+    /* Header */
+    .header {
+      text-align: center;
+      padding: 28px 0 20px;
+    }
+    .header h1 {
+      font-family: 'Fraunces', serif;
+      font-size: 26px;
+      font-weight: 800;
+      color: var(--green-900);
+      letter-spacing: -0.5px;
+    }
+    .header .subtitle {
+      font-size: 13px;
+      color: var(--green-700);
+      margin-top: 4px;
+    }
+    .header .week-label {
+      display: inline-block;
+      margin-top: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--green-800);
+      background: var(--green-300);
+      padding: 4px 12px;
+      border-radius: 20px;
+    }
+
+    /* Login */
+    .login-card {
+      background: #fff;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-lg);
+      padding: 32px 24px;
+      margin-top: 40px;
+    }
+    .login-card h2 {
+      font-family: 'Fraunces', serif;
+      font-size: 22px;
+      color: var(--green-900);
+      margin-bottom: 20px;
+      text-align: center;
+    }
+    .form-group { margin-bottom: 16px; }
+    .form-group label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--gray-600);
+      margin-bottom: 6px;
+    }
+    .form-group select,
+    .form-group input {
+      width: 100%;
+      padding: 12px 14px;
+      border: 1.5px solid var(--gray-200);
+      border-radius: 8px;
+      font-size: 15px;
+      font-family: inherit;
+      background: var(--gray-50);
+      transition: border-color 0.2s;
+    }
+    .form-group select:focus,
+    .form-group input:focus {
+      outline: none;
+      border-color: var(--green-600);
+      background: #fff;
+    }
+    .btn {
+      display: block;
+      width: 100%;
+      padding: 13px;
+      border: none;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-primary {
+      background: var(--green-800);
+      color: #fff;
+    }
+    .btn-primary:hover { background: var(--green-700); }
+    .btn-primary:disabled { background: var(--gray-400); cursor: not-allowed; }
+    .error-msg {
+      background: var(--red-100);
+      color: var(--red-500);
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      margin-bottom: 12px;
+    }
+
+    /* Leaderboard */
+    .card {
+      background: #fff;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-md);
+      margin-bottom: 16px;
+      overflow: hidden;
+    }
+    .card-header {
+      padding: 14px 18px;
+      font-size: 15px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .leaderboard-row {
+      display: flex;
+      align-items: center;
+      padding: 12px 18px;
+      border-top: 1px solid var(--gray-100);
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .leaderboard-row:hover { background: var(--green-100); }
+    .leaderboard-row.me { background: var(--green-200); }
+    .lb-medal { font-size: 20px; width: 32px; text-align: center; }
+    .lb-info { flex: 1; }
+    .lb-name { font-weight: 600; font-size: 15px; }
+    .lb-name .you-badge {
+      font-size: 11px;
+      font-weight: 500;
+      background: var(--green-600);
+      color: #fff;
+      padding: 2px 6px;
+      border-radius: 4px;
+      margin-left: 6px;
+    }
+    .lb-count-big {
+      font-family: 'Fraunces', serif;
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--green-800);
+    }
+    .lb-count-label { font-size: 11px; color: var(--gray-500); }
+
+    /* Entry input */
+    .entry-input-wrap {
+      display: flex;
+      gap: 8px;
+      padding: 14px 18px;
+    }
+    .entry-input-wrap input {
+      flex: 1;
+      padding: 11px 14px;
+      border: 1.5px solid var(--gray-200);
+      border-radius: 8px;
+      font-size: 15px;
+      font-family: inherit;
+      background: var(--gray-50);
+    }
+    .entry-input-wrap input:focus {
+      outline: none;
+      border-color: var(--green-600);
+      background: #fff;
+    }
+    .btn-add {
+      padding: 11px 18px;
+      background: var(--green-700);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .btn-add:hover { background: var(--green-600); }
+    .btn-add:disabled { background: var(--gray-400); }
+
+    /* Warnings */
+    .warning-bar {
+      margin: 0 18px 8px;
+      padding: 10px 14px;
+      background: var(--amber-100);
+      border-radius: 8px;
+      font-size: 13px;
+      color: #92400e;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .warning-bar .btn-force {
+      padding: 4px 10px;
+      background: #fff;
+      border: 1px solid #d97706;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #d97706;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .duplicate-bar {
+      margin: 0 18px 8px;
+      padding: 10px 14px;
+      background: var(--red-100);
+      border-radius: 8px;
+      font-size: 13px;
+      color: #991b1b;
+    }
+
+    /* My list */
+    .my-list { padding: 0 18px 14px; }
+    .my-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--gray-100);
+      font-size: 14px;
+    }
+    .my-item:last-child { border-bottom: none; }
+    .my-item .item-name { color: var(--gray-700); }
+    .my-item .delete-btn {
+      background: none;
+      border: none;
+      color: var(--gray-400);
+      font-size: 16px;
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: 4px;
+    }
+    .my-item .delete-btn:hover { color: var(--red-500); background: var(--red-100); }
+    .empty-state {
+      text-align: center;
+      padding: 24px 18px;
+      color: var(--gray-500);
+      font-size: 14px;
+    }
+
+    /* Other user's list modal */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.4);
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      z-index: 100;
+      animation: fadeIn 0.2s;
+    }
+    .modal-sheet {
+      background: #fff;
+      width: 100%;
+      max-width: 480px;
+      max-height: 70vh;
+      border-radius: 16px 16px 0 0;
+      overflow-y: auto;
+      padding: 20px 18px 32px;
+      animation: slideUp 0.25s;
+    }
+    .modal-handle {
+      width: 36px;
+      height: 4px;
+      background: var(--gray-300, #d1d5db);
+      border-radius: 2px;
+      margin: 0 auto 16px;
+    }
+    .modal-title {
+      font-family: 'Fraunces', serif;
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--green-900);
+      margin-bottom: 12px;
+    }
+    .modal-item {
+      padding: 8px 0;
+      border-bottom: 1px solid var(--gray-100);
+      font-size: 14px;
+      color: var(--gray-700);
+    }
+
+    /* Logout */
+    .logout-wrap { text-align: center; margin-top: 16px; }
+    .btn-logout {
+      background: none;
+      border: none;
+      color: var(--gray-500);
+      font-size: 13px;
+      cursor: pointer;
+      text-decoration: underline;
+      font-family: inherit;
+    }
+
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+
+  <script type="text/babel">
+    const { useState, useEffect, useCallback, useRef } = React;
+
+    const API = '';  // Same origin
+
+    function api(path, opts = {}) {
+      const token = localStorage.getItem('mb_token');
+      const headers = { 'Content-Type': 'application/json', ...opts.headers };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      return fetch(`${API}${path}`, { ...opts, headers })
+        .then(async r => {
+          if (!r.ok) {
+            const data = await r.json().catch(() => ({}));
+            throw new Error(data.detail || `Error ${r.status}`);
+          }
+          return r.json();
+        });
+    }
+
+    // ---- Login Screen ----
+    function LoginScreen({ onLogin }) {
+      const [users, setUsers] = useState([]);
+      const [name, setName] = useState('');
+      const [pin, setPin] = useState('');
+      const [error, setError] = useState('');
+      const [loading, setLoading] = useState(false);
+
+      useEffect(() => {
+        // Try to load user list (unauthenticated endpoint would be nice,
+        // but for now we just show a text input)
+      }, []);
+
+      const handleSubmit = async (e) => {
+        e.preventDefault();
+        if (!name || !pin) return;
+        setLoading(true);
+        setError('');
+        try {
+          const data = await api('/api/auth/login', {
+            method: 'POST',
+            body: JSON.stringify({ name: name.trim(), pin }),
+          });
+          localStorage.setItem('mb_token', data.token);
+          localStorage.setItem('mb_user_id', data.user_id);
+          localStorage.setItem('mb_user_name', data.name);
+          onLogin(data);
+        } catch (err) {
+          setError(err.message);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      return (
+        <div className="app">
+          <div className="header">
+            <h1>🌱 Microbiome Tracker</h1>
+            <div className="subtitle">Family Gut Diversity Competition</div>
+          </div>
+          <div className="login-card">
+            <h2>Welcome back!</h2>
+            {error && <div className="error-msg">{error}</div>}
+            <form onSubmit={handleSubmit}>
+              <div className="form-group">
+                <label>Name</label>
+                <input
+                  type="text"
+                  placeholder="Mike, Julie, or Wika"
+                  value={name}
+                  onChange={e => setName(e.target.value)}
+                  autoCapitalize="words"
+                />
+              </div>
+              <div className="form-group">
+                <label>PIN</label>
+                <input
+                  type="password"
+                  inputMode="numeric"
+                  placeholder="Enter your PIN"
+                  value={pin}
+                  onChange={e => setPin(e.target.value)}
+                  maxLength={8}
+                />
+              </div>
+              <button type="submit" className="btn btn-primary" disabled={loading}>
+                {loading ? 'Logging in...' : 'Log In'}
+              </button>
+            </form>
+          </div>
+        </div>
+      );
+    }
+
+    // ---- Main Dashboard ----
+    function Dashboard({ user, onLogout }) {
+      const [leaderboard, setLeaderboard] = useState(null);
+      const [myEntries, setMyEntries] = useState([]);
+      const [newItem, setNewItem] = useState('');
+      const [warning, setWarning] = useState(null);
+      const [duplicateMsg, setDuplicateMsg] = useState('');
+      const [adding, setAdding] = useState(false);
+      const [viewUser, setViewUser] = useState(null);
+      const [viewEntries, setViewEntries] = useState([]);
+      const inputRef = useRef(null);
+
+      const refresh = useCallback(async () => {
+        try {
+          const [lb, entries] = await Promise.all([
+            api('/api/leaderboard'),
+            api('/api/entries'),
+          ]);
+          setLeaderboard(lb);
+          setMyEntries(entries);
+        } catch (err) {
+          console.error(err);
+        }
+      }, []);
+
+      useEffect(() => { refresh(); }, [refresh]);
+
+      const handleAdd = async (force = false) => {
+        if (!newItem.trim()) return;
+        setAdding(true);
+        setWarning(null);
+        setDuplicateMsg('');
+        try {
+          const data = await api(`/api/entries${force ? '?force=true' : ''}`, {
+            method: 'POST',
+            body: JSON.stringify({ item_name: newItem.trim() }),
+          });
+          if (data.blocked) {
+            // Check if it's a hard duplicate or a near-dup warning
+            if (data.warnings?.some(w => w.includes('already logged'))) {
+              if (data.warnings?.some(w => w.includes('looks similar'))) {
+                setWarning(data.warnings[0]);
+              } else {
+                setDuplicateMsg(data.warnings[0]);
+              }
+            } else if (data.warnings?.length) {
+              setWarning(data.warnings[0]);
+            }
+          } else {
+            setNewItem('');
+            if (data.warnings?.length) {
+              // Non-blocking warning (e.g., spelling suggestion)
+              setWarning(data.warnings.join(' '));
+              setTimeout(() => setWarning(null), 5000);
+            }
+            refresh();
+          }
+        } catch (err) {
+          setDuplicateMsg(err.message);
+        } finally {
+          setAdding(false);
+          inputRef.current?.focus();
+        }
+      };
+
+      const handleDelete = async (id) => {
+        try {
+          await api(`/api/entries/${id}`, { method: 'DELETE' });
+          refresh();
+        } catch (err) {
+          console.error(err);
+        }
+      };
+
+      const handleViewUser = async (userId, userName) => {
+        try {
+          const entries = await api(`/api/entries/user/${userId}`);
+          setViewEntries(entries);
+          setViewUser(userName);
+        } catch (err) {
+          console.error(err);
+        }
+      };
+
+      const medals = ['🥇', '🥈', '🥉'];
+      const weekLabel = leaderboard
+        ? `${leaderboard.week.start_date} – ${leaderboard.week.end_date}`
+        : '...';
+
+      return (
+        <div className="app">
+          <div className="header">
+            <h1>🌱 Microbiome Tracker</h1>
+            <div className="subtitle">Hi {user.name}!</div>
+            <div className="week-label">Week of {weekLabel}</div>
+          </div>
+
+          {/* Leaderboard */}
+          <div className="card">
+            <div className="card-header">🏆 Leaderboard</div>
+            {leaderboard?.standings.map((s, i) => (
+              <div
+                key={s.user_id}
+                className={`leaderboard-row ${s.user_id === user.user_id ? 'me' : ''}`}
+                onClick={() => s.user_id !== user.user_id && handleViewUser(s.user_id, s.name)}
+              >
+                <div className="lb-medal">{medals[i] || `#${s.rank}`}</div>
+                <div className="lb-info">
+                  <div className="lb-name">
+                    {s.name}
+                    {s.user_id === user.user_id && <span className="you-badge">you</span>}
+                  </div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div className="lb-count-big">{s.count}</div>
+                  <div className="lb-count-label">plants</div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Add entry */}
+          <div className="card">
+            <div className="card-header">➕ Log a plant</div>
+            <div className="entry-input-wrap">
+              <input
+                ref={inputRef}
+                type="text"
+                placeholder="e.g. kale, turmeric, walnuts..."
+                value={newItem}
+                onChange={e => { setNewItem(e.target.value); setWarning(null); setDuplicateMsg(''); }}
+                onKeyDown={e => e.key === 'Enter' && handleAdd()}
+                autoCapitalize="none"
+              />
+              <button className="btn-add" onClick={() => handleAdd()} disabled={adding || !newItem.trim()}>
+                {adding ? '...' : 'Add'}
+              </button>
+            </div>
+            {duplicateMsg && <div className="duplicate-bar">⛔ {duplicateMsg}</div>}
+            {warning && (
+              <div className="warning-bar">
+                <span>⚠️ {warning}</span>
+                {warning.includes('similar') && (
+                  <button className="btn-force" onClick={() => handleAdd(true)}>Add anyway</button>
+                )}
+              </div>
+            )}
+
+            {/* My entries */}
+            <div className="my-list">
+              {myEntries.length === 0 ? (
+                <div className="empty-state">No plants logged yet this week. Start adding!</div>
+              ) : (
+                myEntries.map(e => (
+                  <div key={e.id} className="my-item">
+                    <span className="item-name">{e.item_name}</span>
+                    <button className="delete-btn" onClick={() => handleDelete(e.id)}>✕</button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          <div className="logout-wrap">
+            <button className="btn-logout" onClick={onLogout}>Log out</button>
+          </div>
+
+          {/* View other user modal */}
+          {viewUser && (
+            <div className="modal-overlay" onClick={() => setViewUser(null)}>
+              <div className="modal-sheet" onClick={e => e.stopPropagation()}>
+                <div className="modal-handle" />
+                <div className="modal-title">{viewUser}'s plants this week</div>
+                {viewEntries.length === 0 ? (
+                  <div className="empty-state">No plants logged yet.</div>
+                ) : (
+                  viewEntries.map(e => (
+                    <div key={e.id} className="modal-item">{e.item_name}</div>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    // ---- App Root ----
+    function App() {
+      const [user, setUser] = useState(() => {
+        const token = localStorage.getItem('mb_token');
+        const userId = localStorage.getItem('mb_user_id');
+        const name = localStorage.getItem('mb_user_name');
+        if (token && userId && name) {
+          return { token, user_id: parseInt(userId), name };
+        }
+        return null;
+      });
+
+      const handleLogout = () => {
+        localStorage.removeItem('mb_token');
+        localStorage.removeItem('mb_user_id');
+        localStorage.removeItem('mb_user_name');
+        setUser(null);
+      };
+
+      if (!user) {
+        return <LoginScreen onLogin={setUser} />;
+      }
+      return <Dashboard user={user} onLogout={handleLogout} />;
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>

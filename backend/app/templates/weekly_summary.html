@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Weekly Gut Microbiome Digest</title>
+  <style>
+    body { margin: 0; padding: 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #f4f4f4; color: #333; }
+    .container { max-width: 600px; margin: 0 auto; background: #ffffff; }
+    .header { background: linear-gradient(135deg, #2d6a4f 0%, #40916c 50%, #52b788 100%); padding: 32px 24px; text-align: center; }
+    .header h1 { color: #fff; font-size: 28px; margin: 0; font-weight: 700; letter-spacing: -0.5px; }
+    .header p { color: rgba(255,255,255,0.85); font-size: 14px; margin: 8px 0 0; }
+    .intro { padding: 20px 24px; background: #f8faf8; font-size: 14px; line-height: 1.6; color: #555; }
+
+    /* Leaderboard */
+    .leaderboard { padding: 16px 24px 8px; }
+    .leaderboard h2 { font-size: 18px; color: #2d6a4f; margin: 0 0 12px; }
+    .lb-row { display: flex; align-items: center; padding: 10px 12px; margin-bottom: 6px; border-radius: 8px; }
+    .lb-row.rank-1 { background: #d8f3dc; }
+    .lb-row.rank-2 { background: #e9f5ec; }
+    .lb-row.rank-3 { background: #f0f7f1; }
+    .lb-rank { font-size: 20px; font-weight: 700; width: 36px; color: #2d6a4f; }
+    .lb-name { flex: 1; font-size: 15px; font-weight: 600; color: #333; }
+    .lb-count { font-size: 22px; font-weight: 700; color: #40916c; }
+    .lb-label { font-size: 11px; color: #888; margin-left: 4px; }
+
+    /* Person sections */
+    .person-section { padding: 20px 24px; border-top: 1px solid #e8e8e8; }
+    .person-name { font-size: 20px; font-weight: 700; color: #2d6a4f; margin: 0 0 8px; }
+    .praise { font-size: 14px; line-height: 1.6; color: #444; margin-bottom: 12px; }
+    .gut-quip { font-size: 13px; font-style: italic; color: #6c757d; margin-bottom: 12px; padding: 8px 12px; background: #f0faf3; border-left: 3px solid #52b788; border-radius: 0 6px 6px 0; }
+    .veggie-list-header { font-size: 13px; font-weight: 600; color: #666; margin-bottom: 4px; }
+    .veggie-list { font-size: 13px; color: #555; line-height: 1.5; margin-bottom: 12px; padding: 8px 12px; background: #fafafa; border-radius: 6px; }
+
+    /* Spotlight */
+    .spotlight { margin: 12px 0; padding: 12px 16px; border-radius: 8px; }
+    .spotlight-green { background: #d8f3dc; }
+    .spotlight-teal { background: #d0ecee; }
+    .spotlight-sage { background: #e2efda; }
+    .spotlight-title { font-size: 14px; font-weight: 700; color: #2d6a4f; margin-bottom: 6px; }
+    .spotlight-text { font-size: 13px; color: #444; line-height: 1.5; }
+
+    /* Suggestion */
+    .suggestion { font-size: 13px; color: #555; line-height: 1.5; padding: 8px 12px; background: #fff8e1; border-radius: 6px; margin-top: 8px; }
+    .suggestion strong { color: #e65100; }
+
+    /* Footer */
+    .footer { padding: 20px 24px; background: #2d6a4f; text-align: center; }
+    .footer p { color: rgba(255,255,255,0.7); font-size: 12px; margin: 0; }
+
+    @media (max-width: 480px) {
+      .header h1 { font-size: 22px; }
+      .lb-count { font-size: 18px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <h1>🌱 Gut Microbiome Weekly</h1>
+      <p>Week of {{ week_label }}</p>
+    </div>
+
+    <!-- Intro -->
+    <div class="intro">
+      What up fam! Another weekly summary to see who's been aura farming, who's been cooking, and who's cooked 😂
+    </div>
+
+    <!-- Leaderboard -->
+    <div class="leaderboard">
+      <h2>🏆 This Week's Standings</h2>
+      {% for person in leaderboard %}
+      <div class="lb-row rank-{{ person.rank }}">
+        <div class="lb-rank">
+          {% if person.rank == 1 %}🥇{% elif person.rank == 2 %}🥈{% elif person.rank == 3 %}🥉{% else %}{{ person.rank }}{% endif %}
+        </div>
+        <div class="lb-name">{{ person.name }}</div>
+        <div class="lb-count">{{ person.veggie_count }}<span class="lb-label">plants</span></div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <!-- Per-person sections -->
+    {% set spotlight_colors = ['spotlight-green', 'spotlight-teal', 'spotlight-sage'] %}
+    {% for person in persons %}
+    <div class="person-section">
+      <div class="person-name">{{ person.name }}</div>
+
+      <div class="praise">{{ person.praise }}</div>
+
+      {% if person.gut_quip %}
+      <div class="gut-quip">🦠 {{ person.gut_quip }}</div>
+      {% endif %}
+
+      {% if person.veggie_count > 0 %}
+      <div class="veggie-list-header">Your {{ person.veggie_count }} plants this week:</div>
+      <div class="veggie-list">{{ person.veggie_list }}</div>
+
+        {% if person.picked_veggie %}
+        <div class="spotlight {{ spotlight_colors[loop.index0 % 3] }}">
+          <div class="spotlight-title">✨ Spotlight: {{ person.picked_veggie | title }}</div>
+          {% if person.fun_fact %}<div class="spotlight-text">{{ person.fun_fact }}</div>{% endif %}
+          {% if person.benefit %}<div class="spotlight-text">{{ person.benefit }}</div>{% endif %}
+        </div>
+        {% endif %}
+
+        {% if person.suggestion %}
+        <div class="suggestion">
+          <strong>💡 Next week tip:</strong> {{ person.suggestion }}
+        </div>
+        {% endif %}
+      {% endif %}
+    </div>
+    {% endfor %}
+
+    <!-- Footer -->
+    <div class="footer">
+      <p>Keep feeding those gut bacteria! See you next week. 🌿</p>
+    </div>
+  </div>
+</body>
+</html>

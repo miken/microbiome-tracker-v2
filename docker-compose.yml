@@ -1,0 +1,21 @@
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=sqlite+aiosqlite:///./data/microbiome.db
+      - SECRET_KEY=dev-secret-key-change-in-prod
+      - PIN_SALT=dev-salt-change-in-prod
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - AWS_ACCESS_KEY=${AWS_ACCESS_KEY:-}
+      - AWS_SECRET_KEY=${AWS_SECRET_KEY:-}
+      - AWS_REGION=us-west-2
+      - EMAIL_FROM=Gut Microbiome Weekly <microbiome@mikengn.com>
+      - EMAIL_TO=microbiome@mikengn.com
+    volumes:
+      - app-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  app-data:
