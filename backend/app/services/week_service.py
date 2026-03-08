@@ -5,6 +5,7 @@ Weeks run Sunday through Saturday, matching the original Google Sheets cadence
 import datetime
 import zoneinfo
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models import Week
@@ -40,12 +41,20 @@ async def get_or_create_current_week(db: AsyncSession) -> Week:
         )
         for prev_week in prev_result.scalars().all():
             prev_week.is_active = False
-        
+
         week = Week(start_date=start_date, end_date=end_date, is_active=True)
         db.add(week)
-        await db.commit()
-        await db.refresh(week)
-    
+        try:
+            await db.commit()
+            await db.refresh(week)
+        except IntegrityError:
+            # Another concurrent request already created this week — just fetch it
+            await db.rollback()
+            result = await db.execute(
+                select(Week).where(Week.start_date == start_date)
+            )
+            week = result.scalar_one()
+
     return week
 
 
