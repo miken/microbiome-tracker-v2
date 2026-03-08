@@ -27,3 +27,4 @@ inflection==0.5.1      # Singularization fallback
 
 # Utilities
 python-dotenv==1.0.1
+tzdata==2024.2            # Timezone data for zoneinfo (needed in Docker slim images)

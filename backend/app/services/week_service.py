@@ -3,16 +3,19 @@ Week management service — handles weekly cycle boundaries
 Weeks run Sunday through Saturday, matching the original Google Sheets cadence
 """
 import datetime
+import zoneinfo
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models import Week
 
+PACIFIC = zoneinfo.ZoneInfo("America/Los_Angeles")
+
 
 def get_current_week_dates(reference: datetime.date = None) -> tuple[datetime.date, datetime.date]:
     """Get the start (Sunday) and end (Saturday) dates for the current week."""
     if reference is None:
-        reference = datetime.date.today()
+        reference = datetime.datetime.now(PACIFIC).date()
     # Python weekday: Monday=0 ... Sunday=6
     # We want Sunday as start of week
     days_since_sunday = (reference.weekday() + 1) % 7
