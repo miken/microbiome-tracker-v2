@@ -2,13 +2,15 @@
 
 A family gut microbiome diversity competition app. Track vegetables, fruits, nuts, and spices you eat each week — compete with family, get AI-powered insights, and receive a weekly summary email.
 
-## What's New in v2
+## Stack
 
-- **Real web app** replacing Google Sheets — mobile-friendly, fast, works on any device
-- **Smart duplicate detection** — catches exact matches, near-duplicates ("strawberry" vs "strawberries"), and spelling errors
-- **Claude AI-powered weekly emails** — personalized praise, gut quips, veggie spotlights, and suggestions
-- **Docker deployment** — one container, easy to deploy on AWS App Runner
-- **Historical data** — migrated from 2+ years of Google Sheets data
+| Layer | Local dev | Production |
+|-------|-----------|------------|
+| Runtime | Docker Compose | Fly.io (shared-cpu-1x, 256 MB) |
+| Database | SQLite (named volume) | Neon (free PostgreSQL) |
+| Email | AWS SES | AWS SES |
+| AI | Anthropic Claude API | Anthropic Claude API |
+| Domain | localhost:8000 | microbiome.mikengn.com |
 
 ## Quick Start (Local Development)
 
@@ -16,7 +18,8 @@ A family gut microbiome diversity competition app. Track vegetables, fruits, nut
 
 ```bash
 cp .env.example .env
-# Edit .env with your API keys
+# Edit .env — only ANTHROPIC_API_KEY is required for local dev
+# AWS keys are optional (email won't send without them)
 ```
 
 ### 2. Run with Docker Compose
@@ -25,7 +28,7 @@ cp .env.example .env
 docker compose up --build
 ```
 
-The app will be available at `http://localhost:8000`.
+The app will be available at `http://localhost:8000`. SQLite is created automatically inside a Docker named volume (`app-data`) — no DB setup needed.
 
 ### 3. Create initial users
 
@@ -45,8 +48,14 @@ curl -X POST http://localhost:8000/api/admin/users \
 
 ### 4. Import historical data (optional)
 
+Copy the Excel file into the Docker volume first, then run the migration:
+
 ```bash
-docker compose exec app python -m scripts.migrate_from_gsheets /app/data/Microbiome_Optimization__Weekly_Plan.xlsx
+docker cp /path/to/Microbiome_Optimization__Weekly_Plan.xlsx \
+  $(docker compose ps -q app):/app/data/
+
+docker compose exec app python -m scripts.migrate_from_gsheets \
+  /app/data/Microbiome_Optimization__Weekly_Plan.xlsx
 ```
 
 ### 5. Open the app
@@ -55,7 +64,7 @@ Go to `http://localhost:8000`, log in with your name and PIN, and start logging 
 
 ## Running Tests
 
-Tests use an in-memory SQLite database and do not require Docker or any API keys.
+Tests use an in-memory SQLite database — no Docker, no API keys required.
 
 ### Install test dependencies
 
@@ -78,7 +87,7 @@ python3 -m pytest tests/test_auth.py
 python3 -m pytest tests/test_weeks.py
 ```
 
-### Run with verbose output
+### Verbose output
 
 ```bash
 python3 -m pytest -v
@@ -101,62 +110,143 @@ cp .env.example .env
 uvicorn backend.app.main:app --reload --port 8000
 ```
 
-## Deploying to AWS App Runner
+## Production Deployment (Fly.io + Neon)
 
-### Step 1: Push Docker image to ECR
+### Overview
+
+- **Fly.io** hosts the Docker container at `microbiome.mikengn.com`
+- **Neon** provides free serverless PostgreSQL
+- Deploys automatically on `fly deploy`; scales to zero when idle (cold start ~2–4s)
+
+### Deploy a new version
 
 ```bash
-aws ecr create-repository --repository-name microbiome-tracker --region us-west-2
-
-aws ecr get-login-password --region us-west-2 | \
-  docker login --username AWS --password-stdin <ACCOUNT_ID>.dkr.ecr.us-west-2.amazonaws.com
-
-docker build -t microbiome-tracker .
-docker tag microbiome-tracker:latest <ACCOUNT_ID>.dkr.ecr.us-west-2.amazonaws.com/microbiome-tracker:latest
-docker push <ACCOUNT_ID>.dkr.ecr.us-west-2.amazonaws.com/microbiome-tracker:latest
+fly deploy
 ```
 
-### Step 2: Create App Runner service
+That's it — Fly builds the Docker image and does a rolling deploy.
 
-1. **AWS Console → App Runner → Create service**
-2. Source: **Container registry → Amazon ECR**, select your image
-3. Service settings: Port `8000`, CPU `0.25 vCPU`, Memory `0.5 GB`
-4. Add environment variables from `.env.example`
-5. Click **Create & deploy**
+### Environment / secrets
 
-### Step 3: Point your domain
+All secrets are stored in Fly (not in `.env`). To view or update them:
 
-1. In App Runner → **Custom domains → Link domain**
-2. Enter `microbiome.mikengn.com`
-3. Add the CNAME records App Runner gives you in your DNS provider
-4. Wait for validation
+```bash
+fly secrets list
+fly secrets set KEY=value
+```
 
-### Step 4: IAM role for SES (recommended)
+Required secrets:
 
-Create an IAM role with `AmazonSESFullAccess`, attach it as the App Runner **Instance role**, and remove AWS key env vars.
+| Secret | Description |
+|--------|-------------|
+| `DATABASE_URL` | Neon PostgreSQL connection string |
+| `SECRET_KEY` | JWT signing key (random hex, never change after launch) |
+| `PIN_SALT` | PIN hashing salt (random hex, never change after launch) |
+| `ANTHROPIC_API_KEY` | Claude API key for AI email content |
+| `AWS_ACCESS_KEY` | AWS SES sending (optional if using IAM role) |
+| `AWS_SECRET_KEY` | AWS SES sending (optional if using IAM role) |
+| `AWS_REGION` | e.g. `us-west-2` |
+| `EMAIL_FROM` | Sender address shown in emails |
+| `EMAIL_TO` | Recipient address for weekly summary |
+
+> ⚠️ **Never rotate `SECRET_KEY` or `PIN_SALT` in production.** Doing so invalidates all existing JWTs (users get logged out) and breaks all stored PIN hashes (users can't log in).
+
+### Custom domain
+
+The domain is managed in Squarespace DNS with a CNAME pointing to Fly's endpoint. To re-verify or add a new domain:
+
+```bash
+fly certs add microbiome.mikengn.com
+# Follow the DNS instructions Fly prints
+```
+
+### SSH into the production container
+
+```bash
+fly ssh console
+```
+
+### View production logs
+
+```bash
+fly logs
+```
+
+## Admin Scripts
+
+These scripts run against whichever database `DATABASE_URL` points to. Run them locally for Neon, or via `fly ssh console` inside the container.
+
+### Migrate historical data from Google Sheets export
+
+```bash
+# Against local SQLite (Docker):
+docker compose exec app python -m scripts.migrate_from_gsheets /app/data/file.xlsx
+
+# Against Neon (locally — requires asyncpg installed):
+DATABASE_URL="postgresql://..." python3 -m scripts.migrate_from_gsheets /path/to/file.xlsx
+```
+
+The Excel export from Google Sheets strips `/` from sheet names (e.g. "Plants - 3/1" → "Plants - 31"). The script handles date resolution automatically using B1 cell validation.
+
+### Change a user's PIN
+
+There is no in-app PIN change UI. Use this script:
+
+```bash
+# Via fly ssh console (recommended — secrets already loaded):
+fly ssh console
+python3 -m scripts.set_pin Julie newpin
+python3 -m scripts.set_pin Mike newpin
+python3 -m scripts.set_pin Wika newpin
+exit
+
+# Or locally against Neon:
+DATABASE_URL="postgresql://..." PIN_SALT="..." python3 -m scripts.set_pin Julie newpin
+```
 
 ## Architecture
 
 ```
-Docker Container
+Fly.io Container
 ├── FastAPI backend
-│   ├── /api/auth        — PIN login + JWT
-│   ├── /api/entries     — CRUD + dedup + spelling check
-│   ├── /api/leaderboard — weekly standings
-│   ├── /api/weeks       — week management
-│   ├── /api/admin       — user management + test email
-│   └── APScheduler      — Saturday 9PM Pacific cron
-├── React SPA (static)
-├── SQLite (dev) / PostgreSQL (prod)
-├── AWS SES (email)
-└── Claude API (AI content)
+│   ├── /api/auth        — PIN login + JWT (90-day tokens)
+│   ├── /api/entries     — CRUD + exact/near-duplicate + spelling check
+│   ├── /api/leaderboard — weekly standings for all users
+│   ├── /api/weeks       — week management (Sunday–Saturday)
+│   ├── /api/admin       — user management + trigger test email
+│   └── APScheduler      — Saturday 9 PM Pacific weekly email
+├── React SPA (single static index.html, served by FastAPI)
+├── SQLite (local dev) / Neon PostgreSQL (production)
+├── AWS SES (outbound email)
+└── Anthropic Claude API (AI-generated email content)
 ```
+
+### Key design decisions
+
+- **Weeks run Sunday–Saturday** to match the original Google Sheets cadence
+- **Item normalization** lowercases, strips punctuation, and singularizes plurals before dedup checks
+- **Near-duplicate threshold** is SequenceMatcher ratio ≥ 0.80; users can override with `?force=true`
+- **JWT tokens** are 90-day for convenience (family app, not a security product)
+- **AI email content** is cached per veggie in `veggie_benefits_cache` table to avoid redundant API calls
+- **`SECRET_KEY` and `PIN_SALT`** are fixed at first deploy — rotating either breaks all user sessions and stored hashes
 
 ## Weekly Email Content (per person)
 
 - 🏆 Leaderboard standings
-- Short personalized praise (2-3 sentences)
-- 🦠 Gut microbiome quip (1 witty sentence)
+- Short personalized praise (2–3 sentences, AI-generated)
+- 🦠 Gut microbiome quip (1 witty sentence, AI-generated)
 - Plant list for the week
-- ✨ Veggie spotlight — fun fact + health benefit (cached in DB)
-- 💡 Suggestion — try something new or revisit an old favorite
+- ✨ Veggie spotlight — fun fact + health benefit (AI-generated, cached)
+- 💡 Suggestion — try something new or revisit an old favourite
+
+To trigger a test email without waiting for Saturday:
+
+```bash
+# Get a token first
+TOKEN=$(curl -s -X POST https://microbiome.mikengn.com/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Mike","pin":"yourpin"}' | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
+
+curl -X POST https://microbiome.mikengn.com/api/admin/send-test-email \
+  -H "Authorization: Bearer $TOKEN"
+```

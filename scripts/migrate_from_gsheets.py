@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """
 migrate_from_gsheets.py
 
