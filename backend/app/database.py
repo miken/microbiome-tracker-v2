@@ -27,7 +27,12 @@ if DATABASE_URL.startswith("postgresql+asyncpg://"):
         DATABASE_URL = urlunparse(parsed._replace(query=""))
         connect_args["ssl"] = True
 
-engine = create_async_engine(DATABASE_URL, echo=False, connect_args=connect_args)
+engine = create_async_engine(
+    DATABASE_URL,
+    echo=False,
+    connect_args=connect_args,
+    pool_pre_ping=True,   # test connections before use; reconnects if Neon closed them
+)
 async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 
