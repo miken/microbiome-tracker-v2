@@ -40,9 +40,10 @@ async def add_entry(
 
     # Detect canonical remapping early — needed for both duplicate messaging
     # and the post-save info note.
+    # display_name is always lowercase (canonical for mapped items, or item_name.lower() otherwise),
+    # so we compare directly against item_name.lower() — no extra .lower() call needed.
     display_name = get_display_name(item_name)
-    typed = item_name.strip()
-    is_remapped = display_name.lower() != typed.lower()
+    is_remapped = display_name != item_name.lower()
 
     week = await get_or_create_current_week(db)
 
@@ -55,9 +56,9 @@ async def add_entry(
     # 1. Exact duplicate check
     if normalized in existing_normalized:
         if is_remapped:
-            msg = f"You already logged '{typed}' this week! (It's saved as '{display_name}')"
+            msg = f"You already logged '{item_name}' this week! (It's saved as '{display_name}')"
         else:
-            msg = f"You already logged '{typed}' this week!"
+            msg = f"You already logged '{item_name}' this week!"
         return EntryCreateResponse(entry=None, warnings=[msg], blocked=True)
 
     # 2. Near-duplicate check
@@ -79,7 +80,7 @@ async def add_entry(
     # Build canonical note for the frontend info bar (shown for 5 s, then dismissed).
     canonical_note = None
     if is_remapped:
-        canonical_note = f"Mike filed '{typed}' as '{display_name}' in this app — saved! 🌍"
+        canonical_note = f"Mike filed '{item_name}' as '{display_name}' in this app — saved! 🌍"
 
     entry = Entry(
         user_id=current_user.id,

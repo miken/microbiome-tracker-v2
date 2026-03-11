@@ -36,7 +36,8 @@ async def test_add_entry_normalizes_name(client, user, auth_headers):
     )
     assert resp.status_code == 200
     data = resp.json()
-    assert data["entry"]["item_name_normalized"] == "blueberry"
+    assert data["entry"]["item_name"] == "blueberries"          # display: strip + lowercase, not singularized
+    assert data["entry"]["item_name_normalized"] == "blueberry"  # normalized: also singularized
 
 
 async def test_add_entry_rejects_empty_name(client, user, auth_headers):

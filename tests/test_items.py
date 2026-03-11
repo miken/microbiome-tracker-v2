@@ -157,10 +157,10 @@ def test_get_display_name_applies_display_overrides():
     assert get_display_name("jalapeño") == "jalapeño"
 
 
-def test_get_display_name_preserves_original_when_no_mapping():
-    # Non-mapped items: return the user's input as-is (stripped)
-    assert get_display_name("Broccoli") == "Broccoli"
-    assert get_display_name("  Kale  ") == "Kale"
+def test_get_display_name_lowercases_non_mapped_items():
+    # Non-mapped items: strip and lowercase (matches DB convention; display is NOT singularized)
+    assert get_display_name("Broccoli") == "broccoli"
+    assert get_display_name("  Kale  ") == "kale"
     assert get_display_name("kimchi") == "kimchi"
 
 

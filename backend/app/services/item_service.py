@@ -158,14 +158,16 @@ def normalize_item(name: str) -> str:
 def get_display_name(name: str) -> str:
     """
     Returns the display name to store in item_name.
-    If a canonical mapping exists, returns the canonical name as-is (lowercase,
-    matching how users type on phone keyboards). Otherwise returns the original input.
+    - Mapped items:     returns the canonical name (already lowercase).
+    - Non-mapped items: returns the input stripped and lowercased.
+    We do NOT singularize the display name — that is only done for item_name_normalized.
+    This keeps item_name consistent with the DB convention (always lowercase).
     """
     raw = _normalize_raw(name)
     canonical = CANONICAL_MAPPINGS.get(raw)
     if canonical is not None:
         return _DISPLAY_OVERRIDES.get(canonical, canonical)
-    return name.strip()
+    return name.strip().lower()
 
 
 def _singularize(word: str) -> str:

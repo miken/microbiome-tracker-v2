@@ -1,141 +1,227 @@
 #!/usr/bin/env python3
 """
 One-time script to merge duplicate and near-duplicate plant names in the database.
+Also lowercases all item_name display values to match the app's phone-keyboard convention.
 
-Run inside Docker:
-  docker exec <container> python3 /app/scripts/merge_plant_names.py [--dry-run]
+Supports both SQLite (dev) and PostgreSQL/Neon (production) via environment detection.
+
+Usage:
+  # Dev (SQLite) — uses DB_PATH env var, default /app/data/microbiome.db:
+  python3 scripts/merge_plant_names.py [--dry-run]
+
+  # Production (PostgreSQL/Neon):
+  DATABASE_URL=postgresql://... python3 scripts/merge_plant_names.py [--dry-run]
+
+Dependencies:
+  - SQLite:     stdlib sqlite3 (no install needed)
+  - PostgreSQL: pip install psycopg2-binary  (NOT psycopg2 — avoids libpq compile issues)
 """
-import sqlite3
 import os
 import sys
 
-DB_PATH = os.environ.get("DB_PATH", "/app/data/microbiome.db")
-DRY_RUN = "--dry-run" in sys.argv
+# ---------------------------------------------------------------------------
+# Environment detection
+# ---------------------------------------------------------------------------
+DATABASE_URL = os.environ.get("DATABASE_URL", "")
+IS_POSTGRES  = DATABASE_URL.startswith(("postgresql://", "postgres://"))
+DB_PATH      = os.environ.get("DB_PATH", "/app/data/microbiome.db")
+DRY_RUN      = "--dry-run" in sys.argv
+
+# Restored accent for display (SQLite lower() loses accents on some builds,
+# and the general lowercase pass would produce 'jalapeno' without the ñ).
+DISPLAY_OVERRIDES: dict[str, str] = {
+    "jalapeno": "jalapeño",
+}
 
 # ---------------------------------------------------------------------------
 # Master merge list: (variant_normalized, canonical_normalized, canonical_display)
+# All display names are lowercase to match the app's phone-keyboard convention.
 # ---------------------------------------------------------------------------
 MERGES = [
     # ── Category 1: Clear spelling errors ──────────────────────────────────
-    ("algea",                "algae",              "Algae"),
-    ("ashwaganda",           "ashwagandha",         "Ashwagandha"),
-    ("ashwaghanda",          "ashwagandha",         "Ashwagandha"),
-    ("bannana",              "banana",              "Banana"),
-    ("bettroot",             "beet",                "Beet"),
-    ("black sezame seed",    "black sesame seed",   "Black sesame seeds"),
-    ("brocoli",              "broccoli",            "Broccoli"),
-    ("cardamon",             "cardamom",            "Cardamom"),
-    ("canatloupe",           "cantaloupe",          "Cantaloupe"),
-    ("chickpease",           "chickpea",            "Chickpea"),
-    ("chlorofil",            "chlorophyll",         "Chlorophyll"),
-    ("chlorophyl",           "chlorophyll",         "Chlorophyll"),
-    ("corriander",           "coriander",           "Coriander"),
-    ("corriangder",          "coriander",           "Coriander"),
-    ("cucmber",              "cucumber",            "Cucumber"),
-    ("egglant",              "eggplant",            "Eggplant"),
-    ("egg plant",            "eggplant",            "Eggplant"),
-    ("faro",                 "farro",               "Farro"),
-    ("fave bean",            "fava bean",           "Fava bean"),
-    ("giner",                "ginger",              "Ginger"),
-    ("jalepeno",             "jalapeno",            "Jalapeño"),
-    ("jalapeño",             "jalapeno",            "Jalapeño"),
-    ("kakao powder",         "cacao powder",        "Cacao powder"),
-    ("kohlaribi",            "kohlrabi",            "Kohlrabi"),
-    ("leak",                 "leek",                "Leek"),
-    ("macademia nut",        "macadamia nut",       "Macadamia nut"),
-    ("nut meg",              "nutmeg",              "Nutmeg"),
-    ("paprik powder",        "paprika",             "Paprika"),
-    ("pinenapple",           "pineapple",           "Pineapple"),
-    ("pomegrade",            "pomegranate",         "Pomegranate"),
-    ("pomegrenate",          "pomegranate",         "Pomegranate"),
-    ("poppy sead",           "poppy seed",          "Poppy seeds"),
-    ("pumkin seed",          "pumpkin seed",        "Pumpkin seeds"),
-    ("pumking seed",         "pumpkin seed",        "Pumpkin seeds"),
-    ("raddichio",            "radicchio",           "Radicchio"),
-    ("rasberry",             "raspberry",           "Raspberry"),
-    ("sauekraut",            "sauerkraut",          "Sauerkraut"),
-    ("seeweed",              "seaweed",             "Seaweed"),
-    ("tomoatoe",             "tomato",              "Tomato"),
-    ("tomatoe",              "tomato",              "Tomato"),
-    ("cherry tomatoe",       "cherry tomato",       "Cherry tomato"),
-    ("tumeric",              "turmeric",            "Turmeric"),
-    ("walbut",               "walnut",              "Walnut"),
-    ("zuchini",              "zucchini",            "Zucchini"),
-    ("sweet potatoe",        "sweet potato",        "Sweet potato"),
-    ("potatoe",              "potato",              "Potato"),
-    ("purple potatoe",       "purple potato",       "Purple potato"),
-    ("russet potatoe",       "russet potato",       "Russet potato"),
-    ("yukon potatoe",        "yukon potato",        "Yukon potato"),
-    ("fingerling potatoe",   "fingerling potato",   "Fingerling potato"),
-    ("shitake mushroom",     "shiitake mushroom",   "Shiitake mushroom"),
-    ("shittake",             "shiitake mushroom",   "Shiitake mushroom"),
-    ("shittake mushroom",    "shiitake mushroom",   "Shiitake mushroom"),
+    ("algea",                "algae",              "algae"),
+    ("ashwaganda",           "ashwagandha",        "ashwagandha"),
+    ("ashwaghanda",          "ashwagandha",        "ashwagandha"),
+    ("bannana",              "banana",             "banana"),
+    ("bettroot",             "beet",               "beet"),
+    ("black sezame seed",    "black sesame seed",  "black sesame seed"),
+    ("brocoli",              "broccoli",           "broccoli"),
+    ("cardamon",             "cardamom",           "cardamom"),
+    ("canatloupe",           "cantaloupe",         "cantaloupe"),
+    ("chickpease",           "chickpea",           "chickpea"),
+    ("chlorofil",            "chlorophyll",        "chlorophyll"),
+    ("chlorophyl",           "chlorophyll",        "chlorophyll"),
+    ("corriander",           "coriander",          "coriander"),
+    ("corriangder",          "coriander",          "coriander"),
+    ("cucmber",              "cucumber",           "cucumber"),
+    ("egglant",              "eggplant",           "eggplant"),
+    ("egg plant",            "eggplant",           "eggplant"),
+    ("faro",                 "farro",              "farro"),
+    ("fave bean",            "fava bean",          "fava bean"),
+    ("giner",                "ginger",             "ginger"),
+    ("jalepeno",             "jalapeno",           "jalapeño"),
+    ("jalapeño",             "jalapeno",           "jalapeño"),
+    ("kakao powder",         "cacao powder",       "cacao powder"),
+    ("kohlaribi",            "kohlrabi",           "kohlrabi"),
+    ("leak",                 "leek",               "leek"),
+    ("macademia nut",        "macadamia nut",      "macadamia nut"),
+    ("nut meg",              "nutmeg",             "nutmeg"),
+    ("paprik powder",        "paprika",            "paprika"),
+    ("pinenapple",           "pineapple",          "pineapple"),
+    ("pomegrade",            "pomegranate",        "pomegranate"),
+    ("pomegrenate",          "pomegranate",        "pomegranate"),
+    ("poppy sead",           "poppy seed",         "poppy seed"),
+    ("pumkin seed",          "pumpkin seed",       "pumpkin seed"),
+    ("pumking seed",         "pumpkin seed",       "pumpkin seed"),
+    ("raddichio",            "radicchio",          "radicchio"),
+    ("rasberry",             "raspberry",          "raspberry"),
+    ("sauekraut",            "sauerkraut",         "sauerkraut"),
+    ("seeweed",              "seaweed",            "seaweed"),
+    ("tomoatoe",             "tomato",             "tomato"),
+    ("tomatoe",              "tomato",             "tomato"),
+    ("cherry tomatoe",       "cherry tomato",      "cherry tomato"),
+    ("tumeric",              "turmeric",           "turmeric"),
+    ("walbut",               "walnut",             "walnut"),
+    ("zuchini",              "zucchini",           "zucchini"),
+    ("sweet potatoe",        "sweet potato",       "sweet potato"),
+    ("potatoe",              "potato",             "potato"),
+    ("purple potatoe",       "purple potato",      "purple potato"),
+    ("russet potatoe",       "russet potato",      "russet potato"),
+    ("yukon potatoe",        "yukon potato",       "yukon potato"),
+    ("fingerling potatoe",   "fingerling potato",  "fingerling potato"),
+    ("shitake mushroom",     "shiitake mushroom",  "shiitake mushroom"),
+    ("shittake",             "shiitake mushroom",  "shiitake mushroom"),
+    ("shittake mushroom",    "shiitake mushroom",  "shiitake mushroom"),
 
     # ── Category 2: Normalization bug (ves→f should be ves→ve) ─────────────
-    ("chif",                 "chive",               "Chives"),
-    ("clof",                 "clove",               "Clove"),
-    ("olif",                 "olive",               "Olive"),
-    ("garlic chif",          "garlic chive",        "Garlic chives"),
-    ("kalamata olif",        "kalamata olive",      "Kalamata olive"),
-    ("green olif",           "green olive",         "Green olive"),
+    ("chif",                 "chive",              "chive"),
+    ("clof",                 "clove",              "clove"),
+    ("olif",                 "olive",              "olive"),
+    ("garlic chif",          "garlic chive",       "garlic chive"),
+    ("kalamata olif",        "kalamata olive",     "kalamata olive"),
+    ("green olif",           "green olive",        "green olive"),
 
     # ── Category 3: Regional / alternate names → US-English canonical ───────
-    ("rucola",               "arugula",             "Arugula"),
-    ("aubergine",            "eggplant",            "Eggplant"),
-    ("pak choi",             "bok choy",            "Bok choy"),
-    ("pakchoi",              "bok choy",            "Bok choy"),
-    ("dragon fruit",         "pitaya",              "Pitaya"),
-    ("dragonfruit",          "pitaya",              "Pitaya"),
-    ("garbanzo bean",        "chickpea",            "Chickpea"),
-    ("kaki",                 "persimmon",           "Persimmon"),
-    ("khaki",                "persimmon",           "Persimmon"),
-    ("kurkuma",              "turmeric",            "Turmeric"),
-    ("koriander",            "coriander",           "Coriander"),
-    ("basilicum",            "basil",               "Basil"),
-    ("basilicum spice",      "basil",               "Basil"),
-    ("açaí",                 "acai",                "Acai"),
+    ("rucola",               "arugula",            "arugula"),
+    ("aubergine",            "eggplant",           "eggplant"),
+    ("pak choi",             "bok choy",           "bok choy"),
+    ("pakchoi",              "bok choy",           "bok choy"),
+    ("dragon fruit",         "pitaya",             "pitaya"),
+    ("dragonfruit",          "pitaya",             "pitaya"),
+    ("garbanzo bean",        "chickpea",           "chickpea"),
+    ("kaki",                 "persimmon",          "persimmon"),
+    ("khaki",                "persimmon",          "persimmon"),
+    ("kurkuma",              "turmeric",           "turmeric"),
+    ("koriander",            "coriander",          "coriander"),
+    ("basilicum",            "basil",              "basil"),
+    ("basilicum spice",      "basil",              "basil"),
+    ("açaí",                 "acai",               "acai"),
 
     # ── Category 4: Form variations (same thing, different text) ────────────
-    ("chilli",               "chili",               "Chili"),
-    ("chilli flake",         "chili flake",         "Chili flakes"),
-    ("red chilli",           "red chili",           "Red chili"),
-    ("red chilli pepper",    "red chili pepper",    "Red chili pepper"),
-    ("paprika powder",       "paprika",             "Paprika"),
-    ("smoked paprika powder","smoked paprika",       "Smoked paprika"),
-    ("lemon grass",          "lemongrass",          "Lemongrass"),
-    ("passionfruit",         "passion fruit",       "Passion fruit"),
-    ("flaxseed",             "flax seed",           "Flax seeds"),
-    ("microgreen",           "micro green",         "Micro greens"),
-    ("beansprout",           "bean sprout",         "Bean sprouts"),
-    ("soybean",              "soy bean",            "Soy beans"),
-    ("blackcurrant",         "black currant",       "Black currant"),
-    ("blackurrant",          "black currant",       "Black currant"),
-    ("redcurrant",           "red currant",         "Red currant"),
-    ("zaatar",               "za'atar",             "Za'atar"),
-    ("bulgar",               "bulgur",              "Bulgur"),
-    ("bulgar wheat",         "bulgur",              "Bulgur"),
-    ("bulgur wheat",         "bulgur",              "Bulgur"),
-    ("cous cous",            "couscous",            "Couscous"),
-    ("cuscous",              "couscous",            "Couscous"),
-    ("wakame seaweed",       "wakame",              "Wakame"),
-    ("kombu seaweed",        "kombu",               "Kombu"),
-    ("shiitake",             "shiitake mushroom",   "Shiitake mushroom"),
-    ("shiso leaf",           "shiso",               "Shiso"),
-    ("mandarine",            "mandarin",            "Mandarin"),
-    ("pecan nut",            "pecan",               "Pecan"),
-    ("cashew nut",           "cashew",              "Cashew"),
-    ("rosmaryn",             "rosemary",            "Rosemary"),
-    ("miso paste",           "miso",                "Miso"),
+    ("chilli",               "chili",              "chili"),
+    ("chilli flake",         "chili flake",        "chili flake"),
+    ("red chilli",           "red chili",          "red chili"),
+    ("red chilli pepper",    "red chili pepper",   "red chili pepper"),
+    ("paprika powder",       "paprika",            "paprika"),
+    ("smoked paprika powder","smoked paprika",      "smoked paprika"),
+    ("lemon grass",          "lemongrass",         "lemongrass"),
+    ("passionfruit",         "passion fruit",      "passion fruit"),
+    ("flaxseed",             "flax seed",          "flax seed"),
+    ("microgreen",           "micro green",        "micro green"),
+    ("beansprout",           "bean sprout",        "bean sprout"),
+    ("soybean",              "soy bean",           "soy bean"),
+    ("blackcurrant",         "black currant",      "black currant"),
+    ("blackurrant",          "black currant",      "black currant"),
+    ("redcurrant",           "red currant",        "red currant"),
+    ("zaatar",               "za'atar",            "za'atar"),
+    ("bulgar",               "bulgur",             "bulgur"),
+    ("bulgar wheat",         "bulgur",             "bulgur"),
+    ("bulgur wheat",         "bulgur",             "bulgur"),
+    ("cous cous",            "couscous",           "couscous"),
+    ("cuscous",              "couscous",           "couscous"),
+    ("wakame seaweed",       "wakame",             "wakame"),
+    ("kombu seaweed",        "kombu",              "kombu"),
+    ("shiitake",             "shiitake mushroom",  "shiitake mushroom"),
+    ("shiso leaf",           "shiso",              "shiso"),
+    ("mandarine",            "mandarin",           "mandarin"),
+    ("pecan nut",            "pecan",              "pecan"),
+    ("cashew nut",           "cashew",             "cashew"),
+    ("rosmaryn",             "rosemary",           "rosemary"),
+    ("miso paste",           "miso",               "miso"),
 ]
 
 
-def merge_entries(conn: sqlite3.Connection, variant: str, canonical: str, display: str) -> tuple[int, int]:
+# ---------------------------------------------------------------------------
+# DB connection + cursor abstraction
+# ---------------------------------------------------------------------------
+
+def get_connection():
+    """Open a database connection appropriate for the current environment."""
+    if IS_POSTGRES:
+        try:
+            import psycopg2
+        except ImportError:
+            print("ERROR: psycopg2 not installed.")
+            print("       Run: pip install psycopg2-binary")
+            sys.exit(1)
+        conn = psycopg2.connect(DATABASE_URL)
+        conn.autocommit = False
+        return conn
+    else:
+        import sqlite3
+        return sqlite3.connect(DB_PATH)
+
+
+class Cursor:
     """
-    Move all entries with item_name_normalized=variant to canonical.
-    Returns (updated, deleted) counts.
+    Thin wrapper that normalises ? (SQLite) vs %s (PostgreSQL) placeholders
+    so all merge logic above works unchanged for both databases.
     """
-    cur = conn.cursor()
-    rows = cur.execute(
+    def __init__(self, raw_cursor):
+        self._cur = raw_cursor
+
+    def execute(self, sql: str, params=()):
+        if IS_POSTGRES:
+            sql = sql.replace("?", "%s")
+        self._cur.execute(sql, params)
+        return self
+
+    def fetchall(self):
+        return self._cur.fetchall()
+
+    def fetchone(self):
+        return self._cur.fetchone()
+
+
+def cur(conn) -> Cursor:
+    return Cursor(conn.cursor())
+
+
+def get_tables(conn) -> set:
+    """Return the set of table names present in the DB."""
+    c = cur(conn)
+    if IS_POSTGRES:
+        c.execute("SELECT tablename FROM pg_tables WHERE schemaname = 'public'")
+    else:
+        c.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
+    return {r[0] for r in c.fetchall()}
+
+
+# ---------------------------------------------------------------------------
+# Merge logic
+# ---------------------------------------------------------------------------
+
+def merge_entries(conn, variant: str, canonical: str, display: str) -> tuple:
+    """
+    Remap all entries whose item_name_normalized=variant to the canonical form.
+
+    If the user already has the canonical logged in the same week, the variant
+    entry is a true duplicate and is deleted. Otherwise it is updated in place.
+
+    Returns (updated, deleted).
+    """
+    c = cur(conn)
+    rows = c.execute(
         "SELECT id, user_id, week_id FROM entries WHERE item_name_normalized = ?",
         (variant,)
     ).fetchall()
@@ -145,19 +231,19 @@ def merge_entries(conn: sqlite3.Connection, variant: str, canonical: str, displa
 
     updated = deleted = 0
     for entry_id, user_id, week_id in rows:
-        conflict = cur.execute(
-            "SELECT id FROM entries WHERE user_id=? AND week_id=? AND item_name_normalized=?",
+        conflict = c.execute(
+            "SELECT id FROM entries WHERE user_id = ? AND week_id = ? AND item_name_normalized = ?",
             (user_id, week_id, canonical)
         ).fetchone()
 
         if conflict:
             if not DRY_RUN:
-                cur.execute("DELETE FROM entries WHERE id=?", (entry_id,))
+                c.execute("DELETE FROM entries WHERE id = ?", (entry_id,))
             deleted += 1
         else:
             if not DRY_RUN:
-                cur.execute(
-                    "UPDATE entries SET item_name=?, item_name_normalized=? WHERE id=?",
+                c.execute(
+                    "UPDATE entries SET item_name = ?, item_name_normalized = ? WHERE id = ?",
                     (display, canonical, entry_id)
                 )
             updated += 1
@@ -165,101 +251,147 @@ def merge_entries(conn: sqlite3.Connection, variant: str, canonical: str, displa
     return updated, deleted
 
 
-def merge_cache(conn: sqlite3.Connection, variant: str, canonical: str) -> tuple[int, int]:
+def merge_cache(conn, cache_table: str, variant: str, canonical: str) -> tuple:
     """
-    Merge VeggieBenefitsCache rows for variant → canonical.
-    Returns (kept, deleted) counts.
+    Merge veggie_benefits_cache rows for variant → canonical.
+    If a canonical cache row already exists, the variant row is deleted.
+    Returns (updated, deleted).
     """
-    cur = conn.cursor()
-    has_variant = cur.execute(
-        "SELECT COUNT(*) FROM veggiebefitscache WHERE item_name_normalized=?", (variant,)
+    c = cur(conn)
+    has_variant = c.execute(
+        f"SELECT COUNT(*) FROM {cache_table} WHERE item_name_normalized = ?",
+        (variant,)
     ).fetchone()[0]
 
     if not has_variant:
         return 0, 0
 
-    has_canonical = cur.execute(
-        "SELECT COUNT(*) FROM veggiebefitscache WHERE item_name_normalized=?", (canonical,)
+    has_canonical = c.execute(
+        f"SELECT COUNT(*) FROM {cache_table} WHERE item_name_normalized = ?",
+        (canonical,)
     ).fetchone()[0]
 
     if not DRY_RUN:
         if has_canonical:
-            cur.execute("DELETE FROM veggiebefitscache WHERE item_name_normalized=?", (variant,))
+            c.execute(
+                f"DELETE FROM {cache_table} WHERE item_name_normalized = ?",
+                (variant,)
+            )
         else:
-            cur.execute(
-                "UPDATE veggiebefitscache SET item_name_normalized=? WHERE item_name_normalized=?",
+            c.execute(
+                f"UPDATE {cache_table} SET item_name_normalized = ? WHERE item_name_normalized = ?",
                 (canonical, variant)
             )
-    return (0, has_variant) if has_canonical else (has_variant, 0)
+
+    updated = 0 if has_canonical else has_variant
+    deleted = has_variant if has_canonical else 0
+    return updated, deleted
 
 
-def get_cache_table_name(conn: sqlite3.Connection) -> str | None:
-    """Return actual cache table name (handles spelling variant in model)."""
-    tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
-    for name in ("veggiebefitscache", "veggiebenfitscache", "veggiebenefitscache", "veggiebenfitscache"):
-        if name in tables:
-            return name
-    return None
-
+# ---------------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------------
 
 def main():
-    print(f"{'[DRY RUN] ' if DRY_RUN else ''}Connecting to {DB_PATH}")
-    conn = sqlite3.connect(DB_PATH)
+    if IS_POSTGRES:
+        # Mask password in log output
+        host_part = DATABASE_URL.split("@")[-1] if "@" in DATABASE_URL else DATABASE_URL
+        env_label = f"PostgreSQL ({host_part})"
+    else:
+        env_label = f"SQLite ({DB_PATH})"
 
-    cache_table = get_cache_table_name(conn)
+    print(f"{'[DRY RUN] ' if DRY_RUN else ''}Connecting to {env_label}\n")
+    conn = get_connection()
+
+    tables = get_tables(conn)
+    cache_table = "veggie_benefits_cache" if "veggie_benefits_cache" in tables else None
     if cache_table:
         print(f"Cache table found: {cache_table}")
     else:
-        print("No cache table found — skipping cache merges")
+        print("Cache table not present — skipping cache merges")
+    print()
 
+    # ── Step 1: Canonical merges ─────────────────────────────────────────────
+    print("── Step 1: Canonical merges ─────────────────────────────────────")
     total_updated = total_deleted = total_skipped = 0
     cache_updated = cache_deleted = 0
 
     for variant, canonical, display in MERGES:
         u, d = merge_entries(conn, variant, canonical, display)
         if u or d:
-            print(f"  entries [{variant}] → [{canonical}]: +{u} updated, -{d} deleted")
+            print(f"  entries  [{variant}] → [{canonical}]: +{u} updated, -{d} deleted")
             total_updated += u
             total_deleted += d
         else:
             total_skipped += 1
 
         if cache_table:
-            # Inline SQL with actual table name (can't parameterize table name)
-            cur = conn.cursor()
-            has_v = cur.execute(
-                f"SELECT COUNT(*) FROM {cache_table} WHERE item_name_normalized=?", (variant,)
-            ).fetchone()[0]
-            if has_v:
-                has_c = cur.execute(
-                    f"SELECT COUNT(*) FROM {cache_table} WHERE item_name_normalized=?", (canonical,)
-                ).fetchone()[0]
-                if not DRY_RUN:
-                    if has_c:
-                        cur.execute(f"DELETE FROM {cache_table} WHERE item_name_normalized=?", (variant,))
-                        cache_deleted += has_v
-                    else:
-                        cur.execute(
-                            f"UPDATE {cache_table} SET item_name_normalized=? WHERE item_name_normalized=?",
-                            (canonical, variant)
-                        )
-                        cache_updated += has_v
+            cu, cd = merge_cache(conn, cache_table, variant, canonical)
+            if cu or cd:
+                print(f"  cache    [{variant}] → [{canonical}]: +{cu} updated, -{cd} deleted")
+                cache_updated += cu
+                cache_deleted += cd
 
+    # ── Step 2: Lowercase all item_name values ───────────────────────────────
+    print()
+    print("── Step 2: Lowercase all item_name values ───────────────────────")
+    c = cur(conn)
+    cap_count = c.execute(
+        "SELECT COUNT(*) FROM entries WHERE item_name != lower(item_name)"
+    ).fetchone()[0]
+
+    if cap_count:
+        print(f"  {cap_count} entries with capitalised item_name — lowercasing...")
+        if not DRY_RUN:
+            c.execute("UPDATE entries SET item_name = lower(item_name) WHERE item_name != lower(item_name)")
+    else:
+        print("  All item_name values already lowercase.")
+
+    # ── Step 3: Restore display overrides (accent marks) ────────────────────
+    # Must run AFTER the general lowercase so that e.g. 'Jalapeno' → 'jalapeno'
+    # gets corrected to 'jalapeño' in a second pass.
+    print()
+    print("── Step 3: Restore display overrides (accents etc.) ─────────────")
+    override_total = 0
+    for normalized, display in DISPLAY_OVERRIDES.items():
+        c2 = cur(conn)
+        needs_fix = c2.execute(
+            "SELECT COUNT(*) FROM entries WHERE item_name_normalized = ? AND item_name != ?",
+            (normalized, display)
+        ).fetchone()[0]
+        if needs_fix:
+            print(f"  '{normalized}' → display '{display}': {needs_fix} entries")
+            if not DRY_RUN:
+                c2.execute(
+                    "UPDATE entries SET item_name = ? WHERE item_name_normalized = ? AND item_name != ?",
+                    (display, normalized, display)
+                )
+            override_total += needs_fix
+    if not override_total:
+        print("  No display overrides needed.")
+
+    # ── Commit ───────────────────────────────────────────────────────────────
+    print()
     if not DRY_RUN:
         conn.commit()
-        print(f"\nCommitted.")
+        print("Committed. ✓")
     else:
-        print(f"\n[DRY RUN] No changes written.")
+        print("[DRY RUN] No changes written.")
 
     conn.close()
 
-    print(f"\n── Summary ───────────────────────────────────")
-    print(f"  Entries updated : {total_updated}")
-    print(f"  Entries deleted : {total_deleted}  (were duplicates of canonical)")
-    print(f"  Merge pairs with no data: {total_skipped}")
+    # ── Summary ──────────────────────────────────────────────────────────────
+    print()
+    print("── Summary ──────────────────────────────────────────────────────")
+    print(f"  Entries merged (updated) : {total_updated}")
+    print(f"  Entries merged (deleted) : {total_deleted}  (were same-week duplicates)")
+    print(f"  Merge pairs with no data : {total_skipped}")
+    print(f"  Entries lowercased       : {cap_count}")
+    print(f"  Display overrides fixed  : {override_total}")
     if cache_table:
-        print(f"  Cache rows updated: {cache_updated}")
-        print(f"  Cache rows deleted: {cache_deleted}")
+        print(f"  Cache rows updated       : {cache_updated}")
+        print(f"  Cache rows deleted       : {cache_deleted}")
+    print("─────────────────────────────────────────────────────────────────")
 
 
 if __name__ == "__main__":
