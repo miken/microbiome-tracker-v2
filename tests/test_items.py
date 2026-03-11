@@ -100,8 +100,50 @@ def test_normalize_maps_regional_names():
     assert normalize_item("dragonfruit") == "pitaya"
     assert normalize_item("garbanzo beans") == "chickpea"
     assert normalize_item("kaki") == "persimmon"
-    assert normalize_item("kurkuma") == "turmeric"
+    assert normalize_item("kurkuma") == "turmeric"   # German / Polish
+    assert normalize_item("curcuma") == "turmeric"   # French / Italian / Latin
+    assert normalize_item("cúrcuma") == "turmeric"   # Spanish / Portuguese
     assert normalize_item("basilicum") == "basil"
+
+
+def test_normalize_maps_british_english():
+    assert normalize_item("courgette") == "zucchini"
+    assert normalize_item("Courgette") == "zucchini"
+    assert normalize_item("beetroot") == "beet"
+    assert normalize_item("rocket") == "arugula"
+    assert normalize_item("spring onion") == "green onion"
+    assert normalize_item("swede") == "rutabaga"
+    assert normalize_item("broad bean") == "fava bean"
+    assert normalize_item("broad beans") == "fava bean"
+    assert normalize_item("runner bean") == "green bean"
+    assert normalize_item("french bean") == "green bean"
+    assert normalize_item("mangetout") == "snow pea"
+    assert normalize_item("mange tout") == "snow pea"
+    assert normalize_item("cos") == "romaine"
+    assert normalize_item("cos lettuce") == "romaine"
+    assert normalize_item("sharon fruit") == "persimmon"
+    assert normalize_item("clementine") == "mandarin"
+    assert normalize_item("satsuma") == "mandarin"
+    assert normalize_item("bok choi") == "bok choy"
+    assert normalize_item("capsicum") == "bell pepper"
+    assert normalize_item("topinambur") == "jerusalem artichoke"
+    assert normalize_item("feldsalat") == "mache"
+    assert normalize_item("mâche") == "mache"
+
+
+def test_normalize_maps_polish_names():
+    assert normalize_item("rukola") == "arugula"
+    assert normalize_item("Rukola") == "arugula"
+    assert normalize_item("cukinia") == "zucchini"
+    assert normalize_item("burak") == "beet"
+    assert normalize_item("kolendra") == "coriander"
+    assert normalize_item("rozmaryn") == "rosemary"
+    assert normalize_item("borowka") == "blueberry"
+    assert normalize_item("borówka") == "blueberry"
+    assert normalize_item("malina") == "raspberry"
+    assert normalize_item("kalafior") == "cauliflower"
+    assert normalize_item("brokoli") == "broccoli"
+    assert normalize_item("koliander") == "coriander"
 
 
 def test_normalize_maps_form_variations():
@@ -152,13 +194,31 @@ def test_get_display_name_returns_canonical_lowercase_for_mapped_variants():
 
 
 def test_get_display_name_applies_display_overrides():
-    # accent restored regardless of how the user typed it:
-    # - via CANONICAL_MAPPINGS path (misspellings / accented variant)
+    # Accents restored regardless of how the user typed it.
+    # jalapeño — via CANONICAL_MAPPINGS path (misspelling/accented variant → canonical → override)
     assert get_display_name("Jalepeno") == "jalapeño"   # CANONICAL_MAPPINGS["jalepeno"] → "jalapeno" → override
     assert get_display_name("jalapeño") == "jalapeño"   # CANONICAL_MAPPINGS["jalapeño"] → "jalapeno" → override
-    # - via direct _DISPLAY_OVERRIDES path (no canonical mapping, raw IS the override key)
-    assert get_display_name("jalapeno") == "jalapeño"   # no canonical mapping → _DISPLAY_OVERRIDES["jalapeno"]
+    # jalapeño — via direct _DISPLAY_OVERRIDES path (raw IS the override key)
+    assert get_display_name("jalapeno") == "jalapeño"   # _DISPLAY_OVERRIDES["jalapeno"]
     assert get_display_name("Jalapeno") == "jalapeño"   # same, case-insensitive via _normalize_raw
+    # açaí — canonical mapping path (accented typed form) and direct path (unaccented)
+    assert get_display_name("açaí") == "açaí"           # CANONICAL_MAPPINGS["açaí"] → "acai" → override
+    assert get_display_name("acai") == "açaí"           # _DISPLAY_OVERRIDES["acai"]
+    assert get_display_name("Acai") == "açaí"           # same, case-insensitive
+    # yerba maté — canonical mapping path and direct path
+    assert get_display_name("yerba maté") == "yerba maté"  # CANONICAL_MAPPINGS["yerba maté"] → "yerba mate" → override
+    assert get_display_name("yerba mate") == "yerba maté"  # _DISPLAY_OVERRIDES["yerba mate"]
+    # frisée — canonical mapping path and direct path
+    assert get_display_name("frisée") == "frisée"       # CANONICAL_MAPPINGS["frisée"] → "frisee" → override
+    assert get_display_name("frisee") == "frisée"       # _DISPLAY_OVERRIDES["frisee"]
+    assert get_display_name("Frisee") == "frisée"       # same, case-insensitive
+    # mâche — canonical mapping path (accented typed form) and direct path (unaccented)
+    assert get_display_name("mâche") == "mâche"         # CANONICAL_MAPPINGS["mâche"] → "mache" → override
+    assert get_display_name("mache") == "mâche"         # _DISPLAY_OVERRIDES["mache"]
+    assert get_display_name("Mache") == "mâche"         # same, case-insensitive
+    # courgette → zucchini (no special chars, but verify canonical is returned)
+    assert get_display_name("courgette") == "zucchini"
+    assert get_display_name("Courgette") == "zucchini"
 
 
 def test_get_display_name_lowercases_non_mapped_items():
@@ -175,6 +235,26 @@ def test_check_spelling_no_warning_for_mapped_variant():
     assert check_spelling("dragon fruit") is None
     assert check_spelling("rucola") is None
     assert check_spelling("aubergine") is None
+    # Accented-character items: all forms normalise to a canonical that is in KNOWN_ITEMS
+    assert check_spelling("açaí") is None       # → "acai" ∈ KNOWN_ITEMS
+    assert check_spelling("acai") is None       # already canonical
+    assert check_spelling("yerba mate") is None # ∈ KNOWN_ITEMS
+    assert check_spelling("yerba maté") is None # → "yerba mate" ∈ KNOWN_ITEMS
+    assert check_spelling("frisee") is None     # ∈ KNOWN_ITEMS
+    assert check_spelling("frisée") is None     # → "frisee" ∈ KNOWN_ITEMS
+    # British English
+    assert check_spelling("courgette") is None  # → "zucchini" ∈ KNOWN_ITEMS
+    assert check_spelling("beetroot") is None   # → "beet" ∈ KNOWN_ITEMS
+    assert check_spelling("rocket") is None     # → "arugula" ∈ KNOWN_ITEMS
+    assert check_spelling("mangetout") is None  # → "snow pea" ∈ KNOWN_ITEMS
+    assert check_spelling("capsicum") is None   # → "bell pepper" ∈ KNOWN_ITEMS
+    assert check_spelling("mâche") is None      # → "mache" ∈ KNOWN_ITEMS
+    assert check_spelling("mache") is None      # ∈ KNOWN_ITEMS
+    # Polish
+    assert check_spelling("rukola") is None     # → "arugula" ∈ KNOWN_ITEMS
+    assert check_spelling("cukinia") is None    # → "zucchini" ∈ KNOWN_ITEMS
+    assert check_spelling("borówka") is None    # → "blueberry" ∈ KNOWN_ITEMS
+    assert check_spelling("kalafior") is None   # → "cauliflower" ∈ KNOWN_ITEMS
 
 
 def test_check_spelling_suggests_canonical_for_typo_of_canonical():

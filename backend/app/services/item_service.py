@@ -28,14 +28,14 @@ KNOWN_ITEMS = sorted(set([
     "collard green", "coriander", "corn", "cranberry", "cucumber",
     "cumin", "currant", "daikon", "date", "dill",
     "pitaya", "edamame", "eggplant", "elderberry", "endive",
-    "farro", "fennel", "fig", "flax seed", "garlic",
+    "farro", "fava bean", "fennel", "fig", "flax seed", "frisee", "garlic",
     "ginger", "goji berry", "grape", "grapefruit", "green bean",
     "green onion", "green pea", "guava", "habanero", "hazelnut",
-    "hemp seed", "honeydew", "jackfruit", "jalapeno", "jicama",
+    "hemp seed", "honeydew", "jackfruit", "jalapeno", "jerusalem artichoke", "jicama",
     "kale", "kidney bean", "kiwi", "kohlrabi", "kombu",
     "lavender", "leek", "lemon", "lemongrass", "lentil",
     "lettuce", "lima bean", "lime", "lychee", "macadamia nut",
-    "mango", "maple syrup", "marjoram", "matcha", "melon",
+    "mache", "mandarin", "mango", "maple syrup", "marjoram", "matcha", "melon",
     "mint", "miso", "moringa", "mushroom", "mustard",
     "nectarine", "nori", "nutmeg", "oat", "okra",
     "olive", "onion", "orange", "oregano", "papaya",
@@ -47,12 +47,12 @@ KNOWN_ITEMS = sorted(set([
     "raspberry", "red cabbage", "red pepper", "rhubarb", "rice",
     "romaine", "rosemary", "rutabaga", "saffron", "sage",
     "sauerkraut", "scallion", "sesame seed", "shallot", "shiitake mushroom",
-    "shiso", "snap pea", "soy bean", "spinach", "spirulina",
+    "shiso", "snap pea", "snow pea", "soy bean", "spinach", "spirulina",
     "squash", "star anise", "strawberry", "sugar snap pea", "sunflower seed",
     "sweet potato", "swiss chard", "tangerine", "tarragon", "tempeh",
     "thyme", "tofu", "tomatillo", "tomato", "turmeric",
     "turnip", "vanilla", "wakame", "walnut", "wasabi",
-    "watercress", "watermelon", "wheat", "wild rice", "yam", "zucchini",
+    "watercress", "watermelon", "wheat", "wild rice", "yam", "yerba mate", "zucchini",
 ]))
 
 # ---------------------------------------------------------------------------
@@ -76,13 +76,17 @@ CANONICAL_MAPPINGS: dict[str, str] = {
     "dragonfruit":              "pitaya",
     "garbanzo bean":            "chickpea",
     "kaki":                     "persimmon",
-    "kurkuma":                  "turmeric",
+    "kurkuma":                  "turmeric",   # German / Polish
+    "curcuma":                  "turmeric",   # French / Italian / Latin scientific name
+    "cúrcuma":                  "turmeric",   # Spanish / Portuguese (accent on ú)
     "koriander":                "coriander",
     "basilicum":                "basil",
     "basilicum spice":          "basil",
     "açaí":                     "acai",
     "jalapeño":                 "jalapeno",
     "jalepeno":                 "jalapeno",
+    "yerba maté":               "yerba mate",
+    "frisée":                   "frisee",
 
     # ── Alternate spellings / form variations ─────────────────────────────
     "chilli":                   "chili",
@@ -129,12 +133,52 @@ CANONICAL_MAPPINGS: dict[str, str] = {
     "corriander":               "coriander",
     "kohlaribi":                "kohlrabi",
     "pumkin seed":              "pumpkin seed",
+
+    # ── British English / European alternatives ────────────────────────
+    "courgette":                "zucchini",
+    "beetroot":                 "beet",
+    "rocket":                   "arugula",
+    "spring onion":             "green onion",
+    "swede":                    "rutabaga",
+    "broad bean":               "fava bean",
+    "runner bean":              "green bean",
+    "french bean":              "green bean",
+    "mangetout":                "snow pea",
+    "mange tout":               "snow pea",
+    "cos":                      "romaine",
+    "cos lettuce":              "romaine",
+    "sharon fruit":             "persimmon",
+    "clementine":               "mandarin",
+    "satsuma":                  "mandarin",
+    "bok choi":                 "bok choy",
+    "capsicum":                 "bell pepper",
+    "topinambur":               "jerusalem artichoke",
+    "feldsalat":                "mache",
+    "mâche":                    "mache",
+
+    # ── Polish names / spellings ──────────────────────────────────────
+    "rukola":                   "arugula",
+    "cukinia":                  "zucchini",
+    "burak":                    "beet",
+    "kolendra":                 "coriander",
+    "rozmaryn":                 "rosemary",
+    "borowka":                  "blueberry",
+    "borówka":                  "blueberry",
+    "malina":                   "raspberry",
+    "kalafior":                 "cauliflower",
+    "brokoli":                  "broccoli",
+    "koliander":                "coriander",
 }
 
 # Display-name overrides for canonical forms that need special characters
 # restored (e.g. accented chars stripped during normalization).
+# Key = item_name_normalized (no accents), value = display form (with accents).
 _DISPLAY_OVERRIDES: dict[str, str] = {
-    "jalapeno": "jalapeño",  # restore accent mark
+    "jalapeno":   "jalapeño",   # restore ñ
+    "acai":       "açaí",       # restore ç and í
+    "yerba mate": "yerba maté", # restore é
+    "frisee":     "frisée",     # restore é
+    "mache":      "mâche",      # restore â
 }
 
 
