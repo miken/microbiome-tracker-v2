@@ -10,7 +10,7 @@ from ..models import User, Entry
 from ..schemas import EntryCreate, EntryCreateResponse, EntryResponse, DuplicateCheckResponse
 from ..services.auth_service import get_current_user
 from ..services.week_service import get_or_create_current_week
-from ..services.item_service import normalize_item, check_spelling, find_near_duplicate
+from ..services.item_service import normalize_item, get_display_name, check_spelling, find_near_duplicate, KNOWN_ITEMS
 
 router = APIRouter()
 
@@ -37,6 +37,13 @@ async def add_entry(
         raise HTTPException(status_code=400, detail="Item name cannot be empty")
 
     normalized = normalize_item(item_name)
+
+    # Detect canonical remapping early — needed for both duplicate messaging
+    # and the post-save info note.
+    display_name = get_display_name(item_name)
+    typed = item_name.strip()
+    is_remapped = display_name.lower() != typed.lower()
+
     week = await get_or_create_current_week(db)
 
     # Get existing entries for duplicate checking
@@ -47,11 +54,11 @@ async def add_entry(
 
     # 1. Exact duplicate check
     if normalized in existing_normalized:
-        return EntryCreateResponse(
-            entry=None,
-            warnings=[f"You already logged '{normalized}' this week!"],
-            blocked=True,
-        )
+        if is_remapped:
+            msg = f"You already logged '{typed}' this week! (It's saved as '{display_name}')"
+        else:
+            msg = f"You already logged '{typed}' this week!"
+        return EntryCreateResponse(entry=None, warnings=[msg], blocked=True)
 
     # 2. Near-duplicate check
     near = find_near_duplicate(normalized, existing_normalized)
@@ -69,11 +76,15 @@ async def add_entry(
     if suggestion and suggestion != normalized:
         warnings.append(f"Did you mean '{suggestion}'?")
 
-    # Create the entry
+    # Build canonical note for the frontend info bar (shown for 5 s, then dismissed).
+    canonical_note = None
+    if is_remapped:
+        canonical_note = f"Mike filed '{typed}' as '{display_name}' in this app — saved! 🌍"
+
     entry = Entry(
         user_id=current_user.id,
         week_id=week.id,
-        item_name=item_name,
+        item_name=display_name,
         item_name_normalized=normalized,
     )
     db.add(entry)
@@ -89,6 +100,7 @@ async def add_entry(
         ),
         warnings=warnings,
         blocked=False,
+        canonical_note=canonical_note,
     )
 
 
@@ -155,6 +167,25 @@ async def delete_entry(
     await db.delete(entry)
     await db.commit()
     return {"ok": True}
+
+
+@router.get("/suggestions")
+async def get_suggestions(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Return all distinct item names for autocomplete.
+
+    Merges:
+    - All distinct normalized names ever logged (across all users, all time)
+    - The static KNOWN_ITEMS seed list
+
+    Returns a sorted list of lowercase strings, deduplicated.
+    """
+    result = await db.execute(select(Entry.item_name_normalized).distinct())
+    db_names = {row[0] for row in result.fetchall()}
+    all_names = sorted(db_names | set(KNOWN_ITEMS))
+    return {"suggestions": all_names}
 
 
 @router.get("/check", response_model=DuplicateCheckResponse)

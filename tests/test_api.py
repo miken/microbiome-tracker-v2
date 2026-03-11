@@ -82,6 +82,37 @@ async def test_near_duplicate_allowed_with_force(client, user, auth_headers):
     assert data["entry"] is not None
 
 
+async def test_canonical_mapping_returns_note_and_lowercase_display(client, user, auth_headers):
+    # "dragon fruit" maps to canonical "pitaya"; response should carry a note and save lowercase
+    resp = await client.post(
+        "/api/entries", json={"item_name": "dragon fruit"}, headers=auth_headers
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["blocked"] is False
+    assert data["entry"]["item_name"] == "pitaya"          # lowercase, not "Pitaya"
+    assert data["entry"]["item_name_normalized"] == "pitaya"
+    assert data["canonical_note"] is not None
+    assert "dragon fruit" in data["canonical_note"]
+    assert "pitaya" in data["canonical_note"]
+
+
+async def test_canonical_mapping_duplicate_error_references_typed_name(client, user, auth_headers):
+    # First add succeeds (dragon fruit → pitaya)
+    await client.post("/api/entries", json={"item_name": "dragon fruit"}, headers=auth_headers)
+    # Second add of the same variant should be blocked with a message that mentions
+    # the name the user *typed*, not just the stored canonical
+    resp = await client.post(
+        "/api/entries", json={"item_name": "dragon fruit"}, headers=auth_headers
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["blocked"] is True
+    warning = data["warnings"][0]
+    assert "dragon fruit" in warning   # what the user typed
+    assert "pitaya" in warning         # the stored canonical
+
+
 async def test_duplicate_check_from_another_user_is_independent(
     client, user, second_user, auth_headers, second_auth_headers
 ):
@@ -246,6 +277,62 @@ async def test_view_other_user_entries(
     items = resp.json()
     assert len(items) == 1
     assert items[0]["item_name_normalized"] == "kale"
+
+
+# --- Autocomplete suggestions ---
+
+async def test_suggestions_requires_auth(client):
+    resp = await client.get("/api/entries/suggestions")
+    assert resp.status_code == 401
+
+
+async def test_suggestions_includes_known_items(client, user, auth_headers):
+    resp = await client.get("/api/entries/suggestions", headers=auth_headers)
+    assert resp.status_code == 200
+    suggestions = resp.json()["suggestions"]
+    # Spot-check a handful of KNOWN_ITEMS entries
+    for item in ["spinach", "turmeric", "arugula", "pitaya", "chickpea"]:
+        assert item in suggestions, f"expected '{item}' in suggestions"
+
+
+async def test_suggestions_includes_user_added_novel_item(client, user, auth_headers):
+    # "purple yam" is not in KNOWN_ITEMS — it should appear after being logged
+    await client.post("/api/entries", json={"item_name": "purple yam"}, headers=auth_headers)
+    resp = await client.get("/api/entries/suggestions", headers=auth_headers)
+    assert "purple yam" in resp.json()["suggestions"]
+
+
+async def test_suggestions_includes_items_from_all_users(
+    client, user, second_user, auth_headers, second_auth_headers
+):
+    # "fenugreek" is not in KNOWN_ITEMS; second user logs it
+    await client.post("/api/entries", json={"item_name": "fenugreek"}, headers=second_auth_headers)
+    # First user's suggestion list should still include it (shared pool)
+    resp = await client.get("/api/entries/suggestions", headers=auth_headers)
+    assert "fenugreek" in resp.json()["suggestions"]
+
+
+async def test_suggestions_deduplicates_known_items(client, user, auth_headers):
+    # spinach is in KNOWN_ITEMS; logging it should not create a duplicate entry
+    await client.post("/api/entries", json={"item_name": "spinach"}, headers=auth_headers)
+    resp = await client.get("/api/entries/suggestions", headers=auth_headers)
+    suggestions = resp.json()["suggestions"]
+    assert suggestions.count("spinach") == 1
+
+
+async def test_suggestions_returns_sorted_list(client, user, auth_headers):
+    resp = await client.get("/api/entries/suggestions", headers=auth_headers)
+    suggestions = resp.json()["suggestions"]
+    assert suggestions == sorted(suggestions)
+
+
+async def test_suggestions_stores_canonical_not_variant(client, user, auth_headers):
+    # "aubergine" maps to "eggplant"; only the canonical should appear
+    await client.post("/api/entries", json={"item_name": "aubergine"}, headers=auth_headers)
+    resp = await client.get("/api/entries/suggestions", headers=auth_headers)
+    suggestions = resp.json()["suggestions"]
+    assert "eggplant" in suggestions
+    assert "aubergine" not in suggestions   # variant is never stored in DB
 
 
 # --- Admin: create user ---

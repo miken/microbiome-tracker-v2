@@ -43,6 +43,7 @@ class EntryCreateResponse(BaseModel):
     entry: Optional[EntryResponse] = None
     warnings: list[str] = []
     blocked: bool = False
+    canonical_note: Optional[str] = None
 
 
 class DuplicateCheckResponse(BaseModel):
