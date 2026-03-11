@@ -37,13 +37,16 @@
       --radius: 12px;
     }
     * { margin: 0; padding: 0; box-sizing: border-box; }
+    html { overflow-x: hidden; }
     body {
       font-family: 'DM Sans', -apple-system, sans-serif;
       background: linear-gradient(180deg, var(--green-200) 0%, var(--gray-50) 40%);
       min-height: 100vh;
+      width: 100%;
+      overflow-x: hidden;
       color: var(--gray-800);
     }
-    .app { max-width: 480px; margin: 0 auto; padding: 0 16px 80px; }
+    .app { max-width: 480px; width: 100%; margin: 0 auto; padding: 0 16px 80px; }
 
     /* Header */
     .header {
