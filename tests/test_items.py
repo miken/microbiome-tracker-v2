@@ -152,9 +152,13 @@ def test_get_display_name_returns_canonical_lowercase_for_mapped_variants():
 
 
 def test_get_display_name_applies_display_overrides():
-    # jalapeño gets its accent mark restored (still lowercase)
-    assert get_display_name("Jalepeno") == "jalapeño"
-    assert get_display_name("jalapeño") == "jalapeño"
+    # accent restored regardless of how the user typed it:
+    # - via CANONICAL_MAPPINGS path (misspellings / accented variant)
+    assert get_display_name("Jalepeno") == "jalapeño"   # CANONICAL_MAPPINGS["jalepeno"] → "jalapeno" → override
+    assert get_display_name("jalapeño") == "jalapeño"   # CANONICAL_MAPPINGS["jalapeño"] → "jalapeno" → override
+    # - via direct _DISPLAY_OVERRIDES path (no canonical mapping, raw IS the override key)
+    assert get_display_name("jalapeno") == "jalapeño"   # no canonical mapping → _DISPLAY_OVERRIDES["jalapeno"]
+    assert get_display_name("Jalapeno") == "jalapeño"   # same, case-insensitive via _normalize_raw
 
 
 def test_get_display_name_lowercases_non_mapped_items():
