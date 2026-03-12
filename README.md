@@ -2,6 +2,34 @@
 
 A family gut microbiome diversity competition app. Track vegetables, fruits, nuts, and spices you eat each week — compete with family, get AI-powered insights, and receive a weekly summary email.
 
+## Recent Changes
+
+### Item normalization improvements (`item_service.py`)
+
+- **Display names are now always lowercase.** Previously, `get_display_name` could return user-typed capitalisation (e.g. "Blueberries"). Now it always returns the lowercase canonical form (e.g. "blueberries"), keeping the database consistent.
+- **Accented character overrides.** `_DISPLAY_OVERRIDES` restores accents regardless of how the user typed the item. Supported: `jalapeño`, `açaí`, `yerba maté`, `frisée`, `mâche`. Both paths are covered — typing the accented form (via `CANONICAL_MAPPINGS`) and typing the plain ASCII form (direct override lookup).
+- **Expanded canonical mappings** — 30+ new entries in two categories:
+  - *British English / European:* courgette → zucchini, beetroot → beet, rocket → arugula, mangetout → snow pea, cos → romaine, sharon fruit → persimmon, clementine / satsuma → mandarin, bok choi → bok choy, capsicum → bell pepper, topinambur → jerusalem artichoke, feldsalat / mâche → mache, and more.
+  - *Polish names / spellings:* rukola → arugula, cukinia → zucchini, burak → beet, kolendra → coriander, rozmaryn → rosemary, borowka / borówka → blueberry, malina → raspberry, kalafior → cauliflower, brokoli → broccoli, koliander → coriander.
+  - *Curcuma variants:* curcuma / cúrcuma / kurkuma → turmeric (French, Spanish, German/Polish).
+- **New `KNOWN_ITEMS`:** fava bean, snow pea, mandarin, jerusalem artichoke, mache, yerba mate, frisee.
+
+### Production database cleanup (`scripts/merge_plant_names.py`)
+
+Ran against the Neon PostgreSQL database to backfill the above fixes onto historical data:
+- 7,382 `item_name` entries lowercased
+- 853 entries remapped to their canonical form
+- 16 duplicate entries removed
+- 4 jalapeño display overrides applied
+
+### Mobile layout fix
+
+Fixed iOS Safari right-edge overflow. Root cause was a combination of missing `overflow-x: hidden` on `html`/`body` and a missing `min-width: 0` on the autocomplete flex item (the long input placeholder was preventing the flex container from shrinking to fit the viewport).
+
+### Test suite
+
+Grew from 56 → 78 tests. Added `test_normalize_maps_british_english`, `test_normalize_maps_polish_names`, extended display-override coverage, and spelling-warning checks for all new mapped variants.
+
 ## Stack
 
 | Layer | Local dev | Production |
@@ -93,7 +121,7 @@ python3 -m pytest tests/test_weeks.py
 python3 -m pytest -v
 ```
 
-The suite covers 56 tests across four areas:
+The suite covers 78 tests across four areas:
 - **test_auth** — PIN hashing, JWT creation/decoding, login endpoint
 - **test_items** — item normalization, spelling suggestions, near-duplicate detection
 - **test_weeks** — week boundary calculation (Sunday–Saturday)
@@ -224,7 +252,7 @@ Fly.io Container
 ### Key design decisions
 
 - **Weeks run Sunday–Saturday** to match the original Google Sheets cadence
-- **Item normalization** lowercases, strips punctuation, and singularizes plurals before dedup checks
+- **Item normalization** lowercases, strips punctuation, singularizes plurals, and applies canonical mappings (regional names, British English, Polish) before dedup checks; accented characters (jalapeño, açaí, mâche, etc.) are restored via display overrides
 - **Near-duplicate threshold** is SequenceMatcher ratio ≥ 0.80; users can override with `?force=true`
 - **JWT tokens** are 90-day for convenience (family app, not a security product)
 - **AI email content** is cached per veggie in `veggie_benefits_cache` table to avoid redundant API calls
