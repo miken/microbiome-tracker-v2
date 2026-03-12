@@ -4,8 +4,9 @@ A family gut microbiome diversity competition app. Track vegetables, fruits, nut
 
 ## Recent Changes
 
-### Drawer UX improvements (`index.html`)
+### Week label format & drawer UX improvements (`index.html`)
 
+- **Human-readable week label:** The header now shows e.g. "Week of March 8th – 14th" instead of ISO dates. Same-month weeks omit the month on the end date; cross-month weeks spell out both (e.g. "March 29th – April 4th"); cross-year weeks include both years (e.g. "December 29th, 2025 – January 4th, 2026").
 - **Most-recently-entered first:** Plants are now sorted by entry ID descending in both the logged-in user's own list and other users' drawers, so the newest additions appear at the top.
 - **Swipe-to-close with animation:** The drawer now responds to a downward swipe gesture (≥ 80 px) to dismiss it. Closing (via swipe or tapping the overlay) plays a `slideDown`/`fadeOut` animation before the element is removed, matching native sheet behaviour.
 

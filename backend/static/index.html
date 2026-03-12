@@ -616,8 +616,21 @@
       };
 
       const medals = ['🥇', '🥈', '🥉'];
+      const formatWeekLabel = (start, end) => {
+        const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+        const ord = d => `${d}${[,'st','nd','rd'][d%100>>3^1&&d%10]||'th'}`;
+        const [sy, sm, sd] = start.split('-').map(Number);
+        const [ey, em, ed] = end.split('-').map(Number);
+        const startStr = sy !== ey
+          ? `${MONTHS[sm-1]} ${ord(sd)}, ${sy}`
+          : `${MONTHS[sm-1]} ${ord(sd)}`;
+        const endStr = sy !== ey
+          ? `${MONTHS[em-1]} ${ord(ed)}, ${ey}`
+          : sm === em ? ord(ed) : `${MONTHS[em-1]} ${ord(ed)}`;
+        return `${startStr} – ${endStr}`;
+      };
       const weekLabel = leaderboard
-        ? `${leaderboard.week.start_date} – ${leaderboard.week.end_date}`
+        ? formatWeekLabel(leaderboard.week.start_date, leaderboard.week.end_date)
         : '...';
 
       return (
