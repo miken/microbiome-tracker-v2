@@ -500,6 +500,7 @@
       const [activeIndex, setActiveIndex] = useState(-1);
       const [dropdownVisible, setDropdownVisible] = useState(false);
       const inputRef = useRef(null);
+      const swipeTouchStartY = useRef(null);
 
       const refresh = useCallback(async () => {
         try {
@@ -739,13 +740,22 @@
           {/* View other user modal */}
           {viewUser && (
             <div className="modal-overlay" onClick={() => setViewUser(null)}>
-              <div className="modal-sheet" onClick={e => e.stopPropagation()}>
+              <div className="modal-sheet"
+                onClick={e => e.stopPropagation()}
+                onTouchStart={e => { swipeTouchStartY.current = e.touches[0].clientY; }}
+                onTouchEnd={e => {
+                  if (swipeTouchStartY.current !== null && e.changedTouches[0].clientY - swipeTouchStartY.current > 80) {
+                    setViewUser(null);
+                  }
+                  swipeTouchStartY.current = null;
+                }}
+              >
                 <div className="modal-handle" />
                 <div className="modal-title">{viewUser}'s plants this week</div>
                 {viewEntries.length === 0 ? (
                   <div className="empty-state">No plants logged yet.</div>
                 ) : (
-                  viewEntries.map(e => (
+                  [...viewEntries].sort((a, b) => b.id - a.id).map(e => (
                     <div key={e.id} className="modal-item">{e.item_name}</div>
                   ))
                 )}

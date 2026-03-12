@@ -4,6 +4,11 @@ A family gut microbiome diversity competition app. Track vegetables, fruits, nut
 
 ## Recent Changes
 
+### Drawer UX improvements (`index.html`)
+
+- **Most-recently-entered first:** Plants in another user's drawer are now sorted by entry ID descending, so the newest additions appear at the top.
+- **Swipe-to-close:** The drawer now responds to a downward swipe gesture (≥ 80 px) to dismiss it, matching the affordance implied by the drag handle.
+
 ### Item normalization improvements (`item_service.py`)
 
 - **Display names are now always lowercase.** Previously, `get_display_name` could return user-typed capitalisation (e.g. "Blueberries"). Now it always returns the lowercase canonical form (e.g. "blueberries"), keeping the database consistent.
