@@ -723,7 +723,7 @@
               {myEntries.length === 0 ? (
                 <div className="empty-state">No plants logged yet this week. Start adding!</div>
               ) : (
-                myEntries.map(e => (
+                [...myEntries].sort((a, b) => b.id - a.id).map(e => (
                   <div key={e.id} className="my-item">
                     <span className="item-name">{e.item_name}</span>
                     <button className="delete-btn" onClick={() => handleDelete(e.id)}>✕</button>

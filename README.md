@@ -6,7 +6,7 @@ A family gut microbiome diversity competition app. Track vegetables, fruits, nut
 
 ### Drawer UX improvements (`index.html`)
 
-- **Most-recently-entered first:** Plants in another user's drawer are now sorted by entry ID descending, so the newest additions appear at the top.
+- **Most-recently-entered first:** Plants are now sorted by entry ID descending in both the logged-in user's own list and other users' drawers, so the newest additions appear at the top.
 - **Swipe-to-close:** The drawer now responds to a downward swipe gesture (≥ 80 px) to dismiss it, matching the affordance implied by the drag handle.
 
 ### Item normalization improvements (`item_service.py`)

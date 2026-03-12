@@ -5,7 +5,8 @@
       "name": "docker-dev",
       "runtimeExecutable": "docker",
       "runtimeArgs": ["compose", "up", "--build"],
-      "port": 8000
+      "port": 8000,
+      "autoPort": false
     },
     {
       "name": "uvicorn-local",
