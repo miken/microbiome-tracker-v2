@@ -381,7 +381,11 @@
     .suggestion-logged { font-size: 12px; font-weight: 600; color: var(--green-700); }
 
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
     @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+    @keyframes slideDown { from { transform: translateY(0); } to { transform: translateY(100%); } }
+    .modal-overlay.closing { animation: fadeOut 0.25s ease-in forwards; }
+    .modal-sheet.closing { animation: slideDown 0.25s ease-in forwards; }
   </style>
 </head>
 <body>
@@ -495,6 +499,11 @@
       const [adding, setAdding] = useState(false);
       const [viewUser, setViewUser] = useState(null);
       const [viewEntries, setViewEntries] = useState([]);
+      const [drawerClosing, setDrawerClosing] = useState(false);
+      const closeDrawer = () => {
+        setDrawerClosing(true);
+        setTimeout(() => { setViewUser(null); setDrawerClosing(false); }, 250);
+      };
       // Autocomplete
       const [suggestions, setSuggestions] = useState([]);
       const [activeIndex, setActiveIndex] = useState(-1);
@@ -739,13 +748,13 @@
 
           {/* View other user modal */}
           {viewUser && (
-            <div className="modal-overlay" onClick={() => setViewUser(null)}>
-              <div className="modal-sheet"
+            <div className={`modal-overlay${drawerClosing ? ' closing' : ''}`} onClick={closeDrawer}>
+              <div className={`modal-sheet${drawerClosing ? ' closing' : ''}`}
                 onClick={e => e.stopPropagation()}
                 onTouchStart={e => { swipeTouchStartY.current = e.touches[0].clientY; }}
                 onTouchEnd={e => {
                   if (swipeTouchStartY.current !== null && e.changedTouches[0].clientY - swipeTouchStartY.current > 80) {
-                    setViewUser(null);
+                    closeDrawer();
                   }
                   swipeTouchStartY.current = null;
                 }}

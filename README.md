@@ -7,7 +7,7 @@ A family gut microbiome diversity competition app. Track vegetables, fruits, nut
 ### Drawer UX improvements (`index.html`)
 
 - **Most-recently-entered first:** Plants are now sorted by entry ID descending in both the logged-in user's own list and other users' drawers, so the newest additions appear at the top.
-- **Swipe-to-close:** The drawer now responds to a downward swipe gesture (≥ 80 px) to dismiss it, matching the affordance implied by the drag handle.
+- **Swipe-to-close with animation:** The drawer now responds to a downward swipe gesture (≥ 80 px) to dismiss it. Closing (via swipe or tapping the overlay) plays a `slideDown`/`fadeOut` animation before the element is removed, matching native sheet behaviour.
 
 ### Item normalization improvements (`item_service.py`)
 
