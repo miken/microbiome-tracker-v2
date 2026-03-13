@@ -58,16 +58,14 @@ KNOWN_ITEMS = sorted(set([
 # ---------------------------------------------------------------------------
 # Canonical name mapping
 # ---------------------------------------------------------------------------
-# Maps normalized variant → canonical normalized name.
-# Covers three cases:
-#   1. Regional / alternate names  (rucola → arugula, aubergine → eggplant …)
-#   2. Form variations             (passionfruit → passion fruit, shiitake → shiitake mushroom …)
-#   3. Persistent common typos     (tomatoe → tomato, potatoe → potato …)
+# Each sub-dict covers one category of variant → canonical (US-English) name.
+# Add new entries to the appropriate sub-dict; CANONICAL_MAPPINGS merges them.
 #
 # When a user types any of the left-hand keys, their entry is stored under
 # the right-hand canonical name — keeping tallies clean across all users.
-CANONICAL_MAPPINGS: dict[str, str] = {
-    # ── Regional / alternate names (US-English canonical chosen) ──────────
+
+# ── Regional / alternate names (US-English canonical chosen) ──────────────
+_REGIONAL_NAMES: dict[str, str] = {
     "rucola":                   "arugula",
     "aubergine":                "eggplant",
     "pak choi":                 "bok choy",
@@ -87,8 +85,10 @@ CANONICAL_MAPPINGS: dict[str, str] = {
     "jalepeno":                 "jalapeno",
     "yerba maté":               "yerba mate",
     "frisée":                   "frisee",
+}
 
-    # ── Alternate spellings / form variations ─────────────────────────────
+# ── Alternate spellings / form variations ─────────────────────────────────
+_ALTERNATE_SPELLINGS: dict[str, str] = {
     "chilli":                   "chili",
     "chilli flake":             "chili flake",
     "red chilli":               "red chili",
@@ -119,8 +119,10 @@ CANONICAL_MAPPINGS: dict[str, str] = {
     "cashew nut":               "cashew",
     "rosmaryn":                 "rosemary",
     "miso paste":               "miso",
+}
 
-    # ── Persistent common typos (appeared 5+ times historically) ──────────
+# ── Persistent common typos (appeared 5+ times historically) ──────────────
+_COMMON_TYPOS: dict[str, str] = {
     "tomatoe":                  "tomato",
     "cherry tomatoe":           "cherry tomato",
     "sweet potatoe":            "sweet potato",
@@ -133,8 +135,10 @@ CANONICAL_MAPPINGS: dict[str, str] = {
     "corriander":               "coriander",
     "kohlaribi":                "kohlrabi",
     "pumkin seed":              "pumpkin seed",
+}
 
-    # ── British English / European alternatives ────────────────────────
+# ── British English / European alternatives ───────────────────────────────
+_BRITISH_EUROPEAN: dict[str, str] = {
     "courgette":                "zucchini",
     "beetroot":                 "beet",
     "rocket":                   "arugula",
@@ -155,8 +159,10 @@ CANONICAL_MAPPINGS: dict[str, str] = {
     "topinambur":               "jerusalem artichoke",
     "feldsalat":                "mache",
     "mâche":                    "mache",
+}
 
-    # ── Polish names / spellings ──────────────────────────────────────
+# ── Polish names / spellings ──────────────────────────────────────────────
+_POLISH_NAMES: dict[str, str] = {
     "rukola":                   "arugula",
     "cukinia":                  "zucchini",
     "burak":                    "beet",
@@ -168,6 +174,15 @@ CANONICAL_MAPPINGS: dict[str, str] = {
     "kalafior":                 "cauliflower",
     "brokoli":                  "broccoli",
     "koliander":                "coriander",
+}
+
+# Combined mapping — merges all categories above.
+CANONICAL_MAPPINGS: dict[str, str] = {
+    **_REGIONAL_NAMES,
+    **_ALTERNATE_SPELLINGS,
+    **_COMMON_TYPOS,
+    **_BRITISH_EUROPEAN,
+    **_POLISH_NAMES,
 }
 
 # Display-name overrides for canonical forms that need special characters

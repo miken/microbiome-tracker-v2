@@ -3,7 +3,7 @@ Pydantic schemas for API validation
 """
 import datetime
 from typing import Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 # --- Auth ---
@@ -29,14 +29,13 @@ class EntryCreate(BaseModel):
 
 
 class EntryResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     item_name: str
     item_name_normalized: str
     created_at: datetime.datetime
     user_name: Optional[str] = None
-
-    class Config:
-        from_attributes = True
 
 
 class EntryCreateResponse(BaseModel):
@@ -55,13 +54,12 @@ class DuplicateCheckResponse(BaseModel):
 
 # --- Week ---
 class WeekResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     start_date: datetime.date
     end_date: datetime.date
     is_active: bool
-
-    class Config:
-        from_attributes = True
 
 
 # --- Leaderboard ---
@@ -86,11 +84,10 @@ class UserCreate(BaseModel):
 
 
 class UserResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     name: str
     gender: Optional[str] = None
     email: Optional[str] = None
     is_active: bool
-
-    class Config:
-        from_attributes = True

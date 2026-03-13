@@ -4,6 +4,12 @@ A family gut microbiome diversity competition app. Track vegetables, fruits, nut
 
 ## Recent Changes
 
+### Refactoring (schemas, item_service, email tests)
+
+- **Pydantic v2 `ConfigDict`** — replaced deprecated `class Config: from_attributes = True` inner class with `model_config = ConfigDict(from_attributes=True)` in `EntryResponse`, `WeekResponse`, and `UserResponse`. Silences Pydantic v2 deprecation warnings and is forward-compatible with Pydantic v3.
+- **`CANONICAL_MAPPINGS` split into named sub-dicts** (`item_service.py`) — the single flat 100-line dict is now five named dicts (`_REGIONAL_NAMES`, `_ALTERNATE_SPELLINGS`, `_COMMON_TYPOS`, `_BRITISH_EUROPEAN`, `_POLISH_NAMES`) merged into `CANONICAL_MAPPINGS`. Behaviour is unchanged; new synonyms can now be added to the correct category at a glance.
+- **Email service test coverage** — added `tests/test_email_service.py` with 11 tests covering `assemble_email_data` (structure, per-person content, leaderboard ordering), `_get_or_cache_spotlight` (cache hit / miss), and `render_email_html` (template output). All AI calls are mocked; no API keys needed.
+
 ### Week label format & drawer UX improvements (`index.html`)
 
 - **Human-readable week label:** The header now shows e.g. "Week of March 8th – 14th" instead of ISO dates. Same-month weeks omit the month on the end date; cross-month weeks spell out both (e.g. "March 29th – April 4th"); cross-year weeks include both years (e.g. "December 29th, 2025 – January 4th, 2026").
@@ -127,11 +133,12 @@ python3 -m pytest tests/test_weeks.py
 python3 -m pytest -v
 ```
 
-The suite covers 78 tests across four areas:
+The suite covers 89 tests across five areas:
 - **test_auth** — PIN hashing, JWT creation/decoding, login endpoint
 - **test_items** — item normalization, spelling suggestions, near-duplicate detection
 - **test_weeks** — week boundary calculation (Sunday–Saturday)
 - **test_api** — full HTTP integration tests for all endpoints
+- **test_email_service** — email data assembly, spotlight caching, and HTML rendering (AI calls mocked)
 
 ## Running Without Docker
 
