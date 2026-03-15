@@ -65,3 +65,12 @@ async def trigger_test_email(_=Depends(get_current_user)):
         return {"ok": True, "message": "Email sent"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/send-previous-week-email")
+async def trigger_previous_week_email(_=Depends(get_current_user)):
+    """Send the weekly summary for LAST week (e.g. after a missed cron)."""
+    try:
+        await send_weekly_summary(week_offset=-1)
+        return {"ok": True, "message": "Previous week email sent"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

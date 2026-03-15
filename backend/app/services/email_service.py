@@ -74,10 +74,16 @@ async def _get_or_cache_spotlight(db: AsyncSession, veggie: str) -> dict:
     return spotlight
 
 
-async def assemble_email_data(db: AsyncSession) -> dict:
-    """Build the full email data structure for all active users."""
-    # Get current week
+async def assemble_email_data(db: AsyncSession, week_offset: int = 0) -> dict:
+    """Build the full email data structure for all active users.
+    
+    week_offset: 0 = current week, -1 = last week, etc.
+    """
+    # Get target week
     start_date, end_date = get_current_week_dates()
+    if week_offset:
+        start_date += datetime.timedelta(weeks=week_offset)
+        end_date += datetime.timedelta(weeks=week_offset)
     week_result = await db.execute(select(Week).where(Week.start_date == start_date))
     week = week_result.scalar_one_or_none()
 
@@ -154,12 +160,12 @@ def render_email_html(email_data: dict) -> str:
     return template.render(**email_data)
 
 
-async def send_weekly_summary():
+async def send_weekly_summary(week_offset: int = 0):
     """Main entry point — called by the scheduler every Saturday."""
     logger.info("Starting weekly summary email generation...")
 
     async with async_session() as db:
-        email_data = await assemble_email_data(db)
+        email_data = await assemble_email_data(db, week_offset=week_offset)
 
     if not email_data:
         logger.warning("No email data — skipping send")
