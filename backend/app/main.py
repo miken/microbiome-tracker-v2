@@ -32,6 +32,7 @@ async def lifespan(app: FastAPI):
         CronTrigger(day_of_week="sat", hour=21, minute=0, timezone="US/Pacific"),
         id="weekly_summary_email",
         replace_existing=True,
+        misfire_grace_time=300,
     )
     scheduler.start()
     logger.info("Scheduler started — weekly email set for Saturday 9 PM Pacific")
