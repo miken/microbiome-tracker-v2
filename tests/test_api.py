@@ -2,6 +2,7 @@
 API integration tests — covers the full HTTP request/response cycle.
 All tests use an in-memory SQLite DB via the conftest fixtures.
 """
+from unittest.mock import AsyncMock, patch
 
 
 # --- Entries: auth guard ---
@@ -360,3 +361,48 @@ async def test_admin_create_duplicate_user_fails(client, user):
 async def test_admin_list_users_requires_auth(client):
     resp = await client.get("/api/admin/users")
     assert resp.status_code == 401
+
+
+# ---------------------------------------------------------------------------
+# Admin — email recovery endpoints
+# ---------------------------------------------------------------------------
+
+async def test_send_previous_week_email_requires_auth(client):
+    resp = await client.post("/api/admin/send-previous-week-email")
+    assert resp.status_code == 401
+
+
+async def test_send_previous_week_email_calls_with_offset(client, auth_headers):
+    """The recovery endpoint calls send_weekly_summary with week_offset=-1."""
+    mock_send = AsyncMock(return_value=None)
+    with patch("backend.app.routers.admin.send_weekly_summary", mock_send):
+        resp = await client.post(
+            "/api/admin/send-previous-week-email",
+            headers=auth_headers,
+        )
+    assert resp.status_code == 200
+    assert resp.json()["ok"] is True
+    mock_send.assert_called_once_with(week_offset=-1)
+
+
+async def test_send_test_email_calls_with_default_offset(client, auth_headers):
+    """The test-email endpoint calls send_weekly_summary with default offset (0)."""
+    mock_send = AsyncMock(return_value=None)
+    with patch("backend.app.routers.admin.send_weekly_summary", mock_send):
+        resp = await client.post(
+            "/api/admin/send-test-email",
+            headers=auth_headers,
+        )
+    assert resp.status_code == 200
+    mock_send.assert_called_once_with()
+
+
+async def test_send_previous_week_email_returns_500_on_error(client, auth_headers):
+    """The recovery endpoint returns 500 if send_weekly_summary raises."""
+    mock_send = AsyncMock(side_effect=RuntimeError("SES down"))
+    with patch("backend.app.routers.admin.send_weekly_summary", mock_send):
+        resp = await client.post(
+            "/api/admin/send-previous-week-email",
+            headers=auth_headers,
+        )
+    assert resp.status_code == 500

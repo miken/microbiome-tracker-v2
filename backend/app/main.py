@@ -12,7 +12,7 @@ from apscheduler.triggers.cron import CronTrigger
 
 from .database import engine, Base, get_db
 from .routers import auth, entries, weeks, admin, leaderboard
-from .services.email_service import send_weekly_summary
+from .services.email_service import send_weekly_summary, check_and_send_missed_email
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -36,7 +36,13 @@ async def lifespan(app: FastAPI):
     )
     scheduler.start()
     logger.info("Scheduler started — weekly email set for Saturday 9 PM Pacific")
-    
+
+    # Startup catch-up: if last week's email never sent, send it now
+    try:
+        await check_and_send_missed_email()
+    except Exception as e:
+        logger.error(f"Startup catch-up failed: {e}")
+
     yield
     
     # Shutdown

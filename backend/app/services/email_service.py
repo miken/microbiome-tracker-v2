@@ -164,6 +164,20 @@ async def send_weekly_summary(week_offset: int = 0):
     """Main entry point — called by the scheduler every Saturday."""
     logger.info("Starting weekly summary email generation...")
 
+    # Determine which week we're targeting
+    start_date, end_date = get_current_week_dates()
+    if week_offset:
+        start_date += datetime.timedelta(weeks=week_offset)
+        end_date += datetime.timedelta(weeks=week_offset)
+
+    # Check if email was already sent for this week (prevents double-sends)
+    async with async_session() as db:
+        week_result = await db.execute(select(Week).where(Week.start_date == start_date))
+        week = week_result.scalar_one_or_none()
+        if week and week.email_sent_at:
+            logger.info(f"Email already sent for week {start_date} at {week.email_sent_at} — skipping")
+            return
+
     async with async_session() as db:
         email_data = await assemble_email_data(db, week_offset=week_offset)
 
@@ -191,3 +205,38 @@ async def send_weekly_summary(week_offset: int = 0):
     except Exception as e:
         logger.error(f"Failed to send email: {e}")
         raise
+
+    # Stamp the week as sent
+    async with async_session() as db:
+        week_result = await db.execute(select(Week).where(Week.start_date == start_date))
+        week = week_result.scalar_one_or_none()
+        if week:
+            week.email_sent_at = datetime.datetime.utcnow()
+            await db.commit()
+            logger.info(f"Marked week {start_date} email_sent_at = {week.email_sent_at}")
+
+
+async def check_and_send_missed_email():
+    """Startup catch-up: if the most recent completed week's email never sent, send it now.
+
+    Called once during app startup (lifespan). The email_sent_at guard inside
+    send_weekly_summary prevents double-sends if the scheduler also fires.
+    """
+    today = get_current_week_dates()[0]  # start of current week (Sunday)
+    prev_week_start = today - datetime.timedelta(weeks=1)
+
+    async with async_session() as db:
+        result = await db.execute(select(Week).where(Week.start_date == prev_week_start))
+        prev_week = result.scalar_one_or_none()
+
+    if not prev_week:
+        logger.info("Startup catch-up: no previous week row — nothing to recover")
+        return
+
+    if prev_week.email_sent_at:
+        logger.info(f"Startup catch-up: previous week ({prev_week_start}) email already sent at {prev_week.email_sent_at}")
+        return
+
+    # Email was never sent for last week — send it now
+    logger.warning(f"Startup catch-up: previous week ({prev_week_start}) email was never sent — sending now")
+    await send_weekly_summary(week_offset=-1)

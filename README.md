@@ -4,6 +4,20 @@ A family gut microbiome diversity competition app. Track vegetables, fruits, nut
 
 ## Recent Changes
 
+### Weekly email reliability fixes & recovery endpoint
+
+Three issues caused the Saturday 9 PM weekly summary email to fail silently on Fly.io, plus a new automatic recovery mechanism:
+
+1. **Stale DB connections** — Neon PostgreSQL closes idle connections after ~5 minutes. When APScheduler fired the weekly job, the connection pool handed out a dead connection. Fix: `pool_pre_ping=True` on the SQLAlchemy engine (`database.py`), which tests each connection before use and reconnects transparently.
+
+2. **Cold-start misfire** — Fly.io scales to zero when idle. If the container wasn't warm at exactly 9:00 PM Pacific, APScheduler considered the job misfired and silently skipped it. Fix: `misfire_grace_time=300` (5-minute window) on the scheduler job (`main.py`), so the job still fires if the app starts within 5 minutes of the scheduled time.
+
+3. **No recovery path** — When the cron missed, there was no way to send last week's email after the fact. Fix: new `POST /api/admin/send-previous-week-email` endpoint that calls `send_weekly_summary(week_offset=-1)`. The `assemble_email_data` function now accepts a `week_offset` parameter to target any past week.
+
+4. **Startup catch-up** — If the scheduled email fails for any reason (cold start outlasts the grace period, app crash, Fly outage), the next time the app starts (e.g., someone visits on Sunday), it checks whether last week's email was sent and fires it automatically if not. This uses a new `email_sent_at` column on the `Week` model, which also serves as a duplicate-send guard — `send_weekly_summary` checks it before sending and stamps it after success, so the email can never be sent twice for the same week.
+
+Tests added: `week_offset` targeting (3), `email_sent_at` duplicate guard (2), startup catch-up (3), scheduler/DB config guards (3), endpoint integration (4) — 15 new tests total.
+
 ### Refactoring (schemas, item_service, email tests)
 
 - **Pydantic v2 `ConfigDict`** — replaced deprecated `class Config: from_attributes = True` inner class with `model_config = ConfigDict(from_attributes=True)` in `EntryResponse`, `WeekResponse`, and `UserResponse`. Silences Pydantic v2 deprecation warnings and is forward-compatible with Pydantic v3.
@@ -133,12 +147,12 @@ python3 -m pytest tests/test_weeks.py
 python3 -m pytest -v
 ```
 
-The suite covers 89 tests across five areas:
+The suite covers 104 tests across five areas:
 - **test_auth** — PIN hashing, JWT creation/decoding, login endpoint
 - **test_items** — item normalization, spelling suggestions, near-duplicate detection
 - **test_weeks** — week boundary calculation (Sunday–Saturday)
 - **test_api** — full HTTP integration tests for all endpoints
-- **test_email_service** — email data assembly, spotlight caching, and HTML rendering (AI calls mocked)
+- **test_email_service** — email data assembly, spotlight caching, HTML rendering, `week_offset` targeting, `send_weekly_summary` passthrough, and scheduler/DB config guards (AI calls mocked)
 
 ## Running Without Docker
 
@@ -255,7 +269,7 @@ Fly.io Container
 │   ├── /api/leaderboard — weekly standings for all users
 │   ├── /api/weeks       — week management (Sunday–Saturday)
 │   ├── /api/admin       — user management + trigger test email
-│   └── APScheduler      — Saturday 9 PM Pacific weekly email
+│   └── APScheduler      — Saturday 9 PM Pacific weekly email (+ startup catch-up)
 ├── React SPA (single static index.html, served by FastAPI)
 ├── SQLite (local dev) / Neon PostgreSQL (production)
 ├── AWS SES (outbound email)
@@ -288,6 +302,11 @@ TOKEN=$(curl -s -X POST https://microbiome.mikengn.com/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"name":"Mike","pin":"yourpin"}' | python3 -c "import sys,json; print(json.load(sys.stdin)['token'])")
 
+# Send current week's email (test)
 curl -X POST https://microbiome.mikengn.com/api/admin/send-test-email \
+  -H "Authorization: Bearer $TOKEN"
+
+# Send PREVIOUS week's email (recovery after a missed cron)
+curl -X POST https://microbiome.mikengn.com/api/admin/send-previous-week-email \
   -H "Authorization: Bearer $TOKEN"
 ```

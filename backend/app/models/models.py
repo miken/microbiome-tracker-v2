@@ -31,6 +31,7 @@ class Week(Base):
     start_date = Column(Date, unique=True, nullable=False)  # Sunday
     end_date = Column(Date, nullable=False)  # Saturday
     is_active = Column(Boolean, default=True)
+    email_sent_at = Column(DateTime, nullable=True)  # Set after weekly email sends successfully
 
     entries = relationship("Entry", back_populates="week")
 
